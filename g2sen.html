@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>에이징 테스트 G2 - 키패드 순서 기억 (진행자용)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&family=JetBrains+Mono:wght@700;800;900&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            title: ['"Black Han Sans"', 'sans-serif'],
+            sans: ['"Noto Sans KR"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: radial-gradient(circle at 50% 18%, #0d281a 0%, #07150e 55%, #020704 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+
+    /* 3x3 키패드 기본 셀 */
+    .keypad-cell {
+      transition: all 0.08s ease-out;
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      background: rgba(18, 30, 23, 0.85);
+      box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    /* 번호 점등 시 초강력 골든 앰버 플래시 */
+    .keypad-cell.active-flash {
+      background: radial-gradient(circle, #fffbe6 0%, #fbbf24 40%, #ea580c 100%) !important;
+      border-color: #ffffff !important;
+      color: #1e1b18 !important;
+      transform: scale(1.05);
+      box-shadow: 
+        0 0 25px #f59e0b,
+        0 0 65px rgba(245, 158, 11, 0.95),
+        0 0 115px rgba(234, 88, 12, 0.8),
+        inset 0 0 18px #ffffff !important;
+      z-index: 20;
+    }
+
+    /* 버튼 공통 반응 */
+    .host-btn {
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+      touch-action: manipulation;
+    }
+    .host-btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+    .host-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      filter: grayscale(80%);
+    }
+
+    /* 1초 준비 집중 딤/블러 트랜지션 */
+    #focus-dim-overlay {
+      transition: opacity 0.28s ease-in-out;
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between h-screen p-5 lg:p-7 max-w-5xl mx-auto">
+
+  <!-- ================= 상단 단일 바 (오직 게임명 / St# 만 표시) ================= -->
+  <header class="w-full flex items-center justify-center border-b border-white/10 pb-4">
+    <div class="flex items-center gap-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <h1 id="header-title-badge" class="text-2xl sm:text-3xl font-black tracking-wide font-mono text-amber-400">
+        에이징 테스트 G2 / St1
+      </h1>
+    </div>
+  </header>
+
+  <!-- ================= 중앙 메인: 1~9 순수 3x3 키패드 ================= -->
+  <main class="relative flex-1 flex flex-col items-center justify-center my-auto">
+    
+    <!-- 1초 집중 딤/블러 오버레이 -->
+    <div id="focus-dim-overlay" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/65 backdrop-blur-md rounded-3xl pointer-events-none opacity-0">
+      <div class="flex items-center gap-2 px-6 py-3 rounded-full bg-black/80 border border-amber-400/50 text-amber-300 text-base font-bold shadow-2xl animate-pulse">
+        <i class="fa-solid fa-crosshairs text-amber-400"></i>
+        <span>집중하세요...</span>
+      </div>
+    </div>
+
+    <!-- 3x3 키패드 컨테이너 -->
+    <div id="keypad-container" class="w-full max-w-[430px] lg:max-w-[470px] aspect-square p-4 rounded-3xl bg-black/40 backdrop-blur-md border border-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.85)] flex items-center justify-center">
+      
+      <!-- 1 ~ 9 순수 3x3 그리드 -->
+      <div class="w-full h-full grid grid-cols-3 gap-3 lg:gap-4">
+        <div id="pad-1" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">1</div>
+        <div id="pad-2" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">2</div>
+        <div id="pad-3" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">3</div>
+        <div id="pad-4" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">4</div>
+        <div id="pad-5" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">5</div>
+        <div id="pad-6" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">6</div>
+        <div id="pad-7" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">7</div>
+        <div id="pad-8" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">8</div>
+        <div id="pad-9" class="keypad-cell rounded-2xl flex items-center justify-center font-title text-4xl lg:text-5xl text-white">9</div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ================= 하단 진행자 컨트롤 바 (이전 버튼 삭제, 깔끔한 동선) ================= -->
+  <footer class="w-full bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 p-3 lg:p-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- 좌측: 새 시퀀스 랜덤 생성 -->
+      <button onclick="regenerateCurrentStageSequence()" id="btn-re-random" class="host-btn px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 font-bold text-xs flex items-center gap-1.5">
+        <i class="fa-solid fa-shuffle"></i>
+        <span>새 시퀀스 생성</span>
+      </button>
+
+      <!-- 중앙 핵심: 시퀀스 시작 -->
+      <button id="btn-play" onclick="startFocusAndPlay()" class="host-btn px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm sm:text-base shadow-lg shadow-emerald-950/70 flex items-center gap-2 border-t border-emerald-300/40">
+        <i class="fa-solid fa-play"></i>
+        <span>시퀀스 시작</span>
+      </button>
+
+      <!-- 우측: 정답 팝업 및 다음 스테이지 버튼 -->
+      <div class="flex items-center gap-2.5">
+        <!-- 정답 팝업 버튼 -->
+        <button id="btn-reveal" onclick="openAnswerModal()" class="host-btn px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 font-bold text-xs flex items-center gap-1.5">
+          <i class="fa-solid fa-file-circle-check text-amber-400"></i>
+          <span>정답 확인</span>
+        </button>
+
+        <!-- 다음 스테이지 버튼 -->
+        <button id="btn-next-stage" onclick="nextStage()" class="host-btn px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-950/50">
+          <span id="next-stage-text">다음 스테이지</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- ================= 정답 확인 팝업 모달 ================= -->
+  <div id="answer-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-md p-6 shadow-2xl flex flex-col gap-4">
+      
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <h3 class="text-base font-black text-white flex items-center gap-2">
+          <span class="text-amber-400">📋</span>
+          <span>스테이지별 정답</span>
+        </h3>
+        <button onclick="closeAnswerModal()" class="text-slate-400 hover:text-white text-xl p-1 leading-none">✕</button>
+      </div>
+
+      <!-- st1, st2, st3 답안 리스트 -->
+      <div class="space-y-3 font-mono text-sm">
+        <div class="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
+          <span class="text-xs font-bold text-emerald-400">st1</span>
+          <span id="ans-st1" class="text-white font-bold tracking-wider text-base"></span>
+        </div>
+        <div class="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
+          <span class="text-xs font-bold text-amber-400">st2</span>
+          <span id="ans-st2" class="text-white font-bold tracking-wider text-base"></span>
+        </div>
+        <div class="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
+          <span class="text-xs font-bold text-rose-400">st3</span>
+          <span id="ans-st3" class="text-white font-bold tracking-wider text-base"></span>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button onclick="closeAnswerModal()" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white transition-all shadow-md active:scale-95">
+          닫기
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= 로직 스크립트 ================= -->
+  <script>
+    // 오디오 톤 비프음 (초고속 플래시 사운드 피드백)
+    let audioCtx = null;
+    function playBeep(freq = 660, duration = 0.12, type = 'sine') {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        // fail silently
+      }
+    }
+
+    // ================= 단일 라운드 3단계 설정 =================
+    const STAGE_CONFIGS = [
+      { stage: 1, length: 3, lightTime: 270, intervalTime: 120 },
+      { stage: 2, length: 7, lightTime: 220, intervalTime: 100 },
+      { stage: 3, length: 12, lightTime: 170, intervalTime: 85 }
+    ];
+
+    let currentStageIndex = 0;
+    // 세 스테이지 시퀀스를 미리 보관
+    let stageSequences = [[], [], []];
+    let isPlaying = false;
+
+    // DOM 캐싱
+    const headerTitleBadge = document.getElementById('header-title-badge');
+    const focusDimOverlay = document.getElementById('focus-dim-overlay');
+    const btnPlay = document.getElementById('btn-play');
+    const btnReveal = document.getElementById('btn-reveal');
+    const btnNextStage = document.getElementById('btn-next-stage');
+    const nextStageText = document.getElementById('next-stage-text');
+    const btnReRandom = document.getElementById('btn-re-random');
+
+    const answerModal = document.getElementById('answer-modal');
+    const ansSt1 = document.getElementById('ans-st1');
+    const ansSt2 = document.getElementById('ans-st2');
+    const ansSt3 = document.getElementById('ans-st3');
+
+    // ================= 랜덤 시퀀스 생성 (1 ~ 9, 연속 중복 방지) =================
+    function generateSequence(len) {
+      const seq = [];
+      for (let i = 0; i < len; i++) {
+        let num;
+        do {
+          num = Math.floor(Math.random() * 9) + 1;
+        } while (i > 0 && num === seq[i - 1]);
+        seq.push(num);
+      }
+      return seq;
+    }
+
+    // 전체 스테이지 시퀀스 초기화 생성
+    function initAllSequences() {
+      STAGE_CONFIGS.forEach((cfg, idx) => {
+        stageSequences[idx] = generateSequence(cfg.length);
+      });
+      updateAnswerModalContent();
+    }
+
+    // 정답 모달 텍스트 갱신 (st1: 1 - 4 - 5 형식)
+    function updateAnswerModalContent() {
+      ansSt1.textContent = stageSequences[0].join(' - ');
+      ansSt2.textContent = stageSequences[1].join(' - ');
+      ansSt3.textContent = stageSequences[2].join(' - ');
+    }
+
+    // 현재 스테이지 로드
+    function loadStage(index) {
+      if (isPlaying) return;
+      currentStageIndex = index;
+      const stageNum = STAGE_CONFIGS[currentStageIndex].stage;
+
+      // 상단 바: 에이징 테스트 G2 / St1
+      headerTitleBadge.textContent = `에이징 테스트 G2 / St${stageNum}`;
+
+      // 마지막 스테이지일 때 다음 버튼 텍스트 변경
+      if (currentStageIndex === STAGE_CONFIGS.length - 1) {
+        nextStageText.textContent = '처음으로';
+      } else {
+        nextStageText.textContent = '다음 스테이지';
+      }
+    }
+
+    // 다음 스테이지 진행 (St3에서 누르면 St1로 순환)
+    function nextStage() {
+      if (isPlaying) return;
+      const nextIndex = (currentStageIndex + 1) % STAGE_CONFIGS.length;
+      loadStage(nextIndex);
+    }
+
+    // 현재 스테이지 새 시퀀스 재생성
+    function regenerateCurrentStageSequence() {
+      if (isPlaying) return;
+      stageSequences[currentStageIndex] = generateSequence(STAGE_CONFIGS[currentStageIndex].length);
+      updateAnswerModalContent();
+    }
+
+    function setControlsDisabled(disabled) {
+      isPlaying = disabled;
+      btnPlay.disabled = disabled;
+      btnReveal.disabled = disabled;
+      btnNextStage.disabled = disabled;
+      btnReRandom.disabled = disabled;
+    }
+
+    // ================= 재생 로직 (1초 블러 후 초고속 번호 발광) =================
+    async function startFocusAndPlay() {
+      if (isPlaying) return;
+      setControlsDisabled(true);
+
+      // 1초간 흐려지는 포커스 효과
+      focusDimOverlay.classList.remove('opacity-0');
+      focusDimOverlay.classList.add('opacity-100');
+      playBeep(440, 0.1, 'sine');
+
+      await new Promise(r => setTimeout(r, 1000));
+
+      // 흐려짐 해제 후 바로 번호 점등
+      focusDimOverlay.classList.remove('opacity-100');
+      focusDimOverlay.classList.add('opacity-0');
+      await new Promise(r => setTimeout(r, 90));
+
+      await playSequenceAnimation();
+    }
+
+    // 숫자별 고속 플래시 루프
+    async function playSequenceAnimation() {
+      const cfg = STAGE_CONFIGS[currentStageIndex];
+      const sequence = stageSequences[currentStageIndex];
+
+      for (let i = 0; i < sequence.length; i++) {
+        const num = sequence[i];
+        const cell = document.getElementById(`pad-${num}`);
+
+        if (cell) {
+          cell.classList.add('active-flash');
+          playBeep(520 + (num * 45), cfg.lightTime / 1000, 'square');
+        }
+
+        await new Promise(r => setTimeout(r, cfg.lightTime));
+
+        if (cell) {
+          cell.classList.remove('active-flash');
+        }
+        await new Promise(r => setTimeout(r, cfg.intervalTime));
+      }
+
+      setControlsDisabled(false);
+      playBeep(784, 0.35, 'triangle');
+    }
+
+    // ================= 정답 확인 팝업 모달 열기/닫기 =================
+    function openAnswerModal() {
+      updateAnswerModalContent();
+      answerModal.classList.remove('hidden');
+      answerModal.classList.add('flex');
+    }
+
+    function closeAnswerModal() {
+      answerModal.classList.add('hidden');
+      answerModal.classList.remove('flex');
+    }
+
+    // 초기화
+    window.onload = function() {
+      initAllSequences();
+      loadStage(0);
+    };
+  </script>
+</body>
+</html>
