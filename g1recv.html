@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>에이징 테스트 G1 - 색깔 단어 게임</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pretendard Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * {
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: radial-gradient(circle at 50% 12%, #193d28 0%, #0d2317 55%, #05130b 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+      touch-action: manipulation;
+    }
+    /* 1안 디테일: 상단 하이라이트 베벨 + 4px 입체 림 + 경쾌한 즉각 반응 */
+    .keypad-btn {
+      touch-action: manipulation;
+      transition: transform 0.05s ease-out, border-bottom-width 0.05s ease-out, filter 0.05s ease-out;
+      border-top: 1px solid rgba(255, 255, 255, 0.42);
+      border-bottom-width: 4px;
+      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
+    }
+    .keypad-btn:active {
+      transform: translateY(3px);
+      border-bottom-width: 1px;
+      filter: brightness(0.97);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    /* 은은한 배경 눈꽃 효과 */
+    .snowflake {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.22;
+      animation: snowfall linear infinite;
+    }
+    @keyframes snowfall {
+      0% { transform: translateY(-8px) translateX(0); opacity: 0; }
+      15% { opacity: 0.3; }
+      85% { opacity: 0.25; }
+      100% { transform: translateY(105vh) translateX(20px); opacity: 0; }
+    }
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-3.5 sm:p-5 max-w-md mx-auto relative overflow-x-hidden">
+
+  <!-- 은은한 크리스마스 눈꽃 배경 효과 -->
+  <div id="snow-layer" class="fixed inset-0 overflow-hidden pointer-events-none z-0"></div>
+
+  <!-- 헤더 영역 -->
+  <header class="w-full flex flex-col items-center pt-2 pb-2 z-10 text-center">
+    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/35 text-emerald-300 text-xs font-semibold tracking-wider mb-1.5 shadow-sm">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      에이징 테스트 G1
+    </div>
+    <h1 class="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-1.5">
+      <span>🎨</span>
+      <span>색깔 단어 게임</span>
+    </h1>
+    <p class="text-xs text-emerald-200/75 mt-0.5 font-medium">
+      화면에 제시되는 단어의 <span class="text-amber-300 font-bold underline underline-offset-2">글자 색상</span>을 기록하세요
+    </p>
+  </header>
+
+  <!-- 메인 영역: 현황판 & 3x3 키패드 -->
+  <main class="w-full flex-1 flex flex-col justify-center my-auto z-10 space-y-3">
+    
+    <!-- 기록 현황 및 프로그레스 바 카드 -->
+    <div class="bg-black/35 backdrop-blur-md border border-white/10 rounded-2xl p-3.5 shadow-xl">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-slate-300">기록 현황</span>
+          <span id="status-badge" class="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span>대기 중</span>
+          </span>
+        </div>
+        <div class="text-sm font-black tracking-wide font-mono">
+          <span id="current-count" class="text-emerald-400 text-lg">0</span>
+          <span class="text-slate-400">/ 15</span>
+        </div>
+      </div>
+
+      <!-- 프로그레스 게이지 바 -->
+      <div class="w-full bg-white/10 h-2.5 rounded-full overflow-hidden p-0.5 border border-white/5">
+        <div id="progress-bar" class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-150 rounded-full w-0"></div>
+      </div>
+    </div>
+
+    <!-- 3x3 정사각형 키패드 컨테이너 -->
+    <div class="relative w-full aspect-square bg-black/30 backdrop-blur-md rounded-3xl border border-white/10 p-3 shadow-2xl flex items-center justify-center">
+      
+      <!-- 시작 전 / 완료 후 오버레이 락 -->
+      <div id="lock-overlay" class="absolute inset-0 z-20 bg-black/85 backdrop-blur-md rounded-3xl flex flex-col items-center justify-center p-6 text-center transition-all duration-200">
+        
+        <!-- 시작 전 안내 -->
+        <div id="overlay-start-content" class="flex flex-col items-center w-full max-w-xs">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center text-3xl mb-3 shadow-inner">
+            🔔
+          </div>
+          <h2 class="text-lg font-bold text-white mb-1">준비되셨나요?</h2>
+          <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+            진행자의 신호에 맞춰 시작 버튼을 누르면<br /><span class="text-amber-300 font-semibold">색상 키패드</span>가 활성화됩니다.
+          </p>
+          <button id="btn-start" onclick="startGame()" class="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-base tracking-wide shadow-xl shadow-emerald-950/60 hover:brightness-110 active:scale-95 transition-all border-t border-emerald-300/40">
+            게임 시작하기
+          </button>
+        </div>
+
+        <!-- 15개 완료 후 안내 -->
+        <div id="overlay-finish-content" class="hidden flex flex-col items-center w-full max-w-xs">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/30 to-yellow-500/20 border border-amber-400/40 flex items-center justify-center text-3xl mb-3">
+            ✨
+          </div>
+          <h2 class="text-xl font-extrabold text-white mb-1">15개 입력 완료!</h2>
+          <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+            모든 단어 색상 입력이 마감되었습니다.<br />하단의 기록 목록을 확인하고 제출하세요.
+          </p>
+          <button onclick="toggleHistoryModal()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-sm shadow-lg active:scale-95 transition-all">
+            입력 답안 확인하기
+          </button>
+        </div>
+      </div>
+
+      <!-- 3x3 키패드 그리드 (정사각형 비율 유지) -->
+      <div id="keypad-grid" class="w-full h-full grid grid-cols-3 gap-2.5">
+        <!-- 9개 버튼이 JS를 통해 즉시 렌더링됩니다 -->
+      </div>
+    </div>
+
+    <!-- 주의사항 문구 -->
+    <div class="flex items-center justify-between px-1 text-[11px] text-slate-400">
+      <div class="flex items-center gap-1.5">
+        <span>최근 터치:</span>
+        <span id="last-selection-badge" class="px-2 py-0.5 rounded-full font-bold bg-white/10 text-white/50 text-[10px]">없음</span>
+      </div>
+      <span>※ 한 번 누른 색상은 수정 불가</span>
+    </div>
+  </main>
+
+  <!-- 하단 액션 버튼 바 -->
+  <footer class="w-full pt-2 pb-2 z-10 flex flex-col items-center gap-2">
+    <div class="w-full flex items-center justify-between gap-2.5">
+      <!-- 답안 검수 모달 버튼 -->
+      <button onclick="toggleHistoryModal()" class="flex-1 py-3 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-bold text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+        <span>📋</span>
+        <span>입력 내역 검수 (<span id="history-badge-count" class="text-amber-300 font-mono font-bold">0</span>)</span>
+      </button>
+
+      <!-- 리셋 버튼 -->
+      <button onclick="openResetModal()" class="py-3 px-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+        <span>🔄</span>
+        <span>리셋</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- 입력 내역 검수 모달 (1~15번 순서 확인) -->
+  <div id="history-modal" class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-sm max-h-[82vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>📋</span>
+          <span>입력 답안 목록</span>
+          <span class="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full" id="modal-counter">0 / 15</span>
+        </h3>
+        <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-white text-xl leading-none p-1">✕</button>
+      </div>
+
+      <div id="history-list" class="p-3.5 overflow-y-auto space-y-2 flex-1 text-xs">
+        <!-- JS 동적 생성 -->
+      </div>
+
+      <div class="p-3 border-t border-white/10 bg-white/5 flex gap-2">
+        <button onclick="toggleHistoryModal()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md active:scale-95">
+          확인 완료 (닫기)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 초기화(리셋) 확인 모달 -->
+  <div id="reset-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-xs p-5 text-center shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 mx-auto flex items-center justify-center text-2xl mb-3">
+        ⚠️
+      </div>
+      <h3 class="text-base font-bold text-white mb-1.5">기록을 초기화할까요?</h3>
+      <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+        입력된 모든 답안이 삭제되고<br />게임 시작 전 대기 상태로 되돌아갑니다.
+      </p>
+      <div class="flex items-center gap-2.5">
+        <button onclick="closeResetModal()" class="flex-1 py-2.5 rounded-xl bg-white/10 text-xs font-semibold text-slate-300 hover:bg-white/15 active:scale-95 transition-all">
+          취소
+        </button>
+        <button onclick="confirmReset()" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white active:scale-95 transition-all shadow-lg shadow-rose-950">
+          초기화
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 9개 색상 정의 (정밀 미세 조색 완료된 파레트)
+    const COLOR_PALETTE = [
+      { id: 'red', name: '빨간색', bg: 'from-[#f87171] to-[#dc2626]', border: 'border-[#991b1b]', dot: 'bg-red-100', text: 'text-white', hex: '#dc2626' },
+      { id: 'orange', name: '주황색', bg: 'from-[#fb923c] to-[#ea580c]', border: 'border-[#9a3412]', dot: 'bg-orange-100', text: 'text-white', hex: '#ea580c' },
+      { id: 'yellow', name: '노란색', bg: 'from-[#fdf08a] to-[#f4dc47]', border: 'border-[#ca8a04]', dot: 'bg-yellow-100', text: 'text-slate-950', hex: '#f4dc47' },
+      { id: 'green', name: '초록색', bg: 'from-[#10b981] to-[#047857]', border: 'border-[#064e3b]', dot: 'bg-emerald-100', text: 'text-white', hex: '#047857' },
+      { id: 'blue', name: '파란색', bg: 'from-[#38bdf8] to-[#0284c7]', border: 'border-[#0369a1]', dot: 'bg-sky-100', text: 'text-white', hex: '#0284c7' },
+      { id: 'pink', name: '핑크색', bg: 'from-[#f472b6] to-[#db2777]', border: 'border-[#9d174d]', dot: 'bg-rose-100', text: 'text-white', hex: '#db2777' },
+      { id: 'purple', name: '보라색', bg: 'from-[#af8cf2] to-[#8854de]', border: 'border-[#6b21a8]', dot: 'bg-purple-100', text: 'text-white', hex: '#8854de' },
+      { id: 'brown', name: '갈색', bg: 'from-[#964b28] to-[#71320e]', border: 'border-[#431802]', dot: 'bg-amber-100', text: 'text-amber-50', hex: '#71320e' },
+      { id: 'black', name: '검정색', bg: 'from-[#323640] to-[#1c1e24]', border: 'border-[#0f1115]', dot: 'bg-slate-400', text: 'text-white', hex: '#1c1e24' }
+    ];
+
+    const MAX_SELECTIONS = 15;
+    let selectedColors = [];
+    let isGameActive = false;
+
+    // DOM 캐싱
+    const keypadGrid = document.getElementById('keypad-grid');
+    const lockOverlay = document.getElementById('lock-overlay');
+    const overlayStartContent = document.getElementById('overlay-start-content');
+    const overlayFinishContent = document.getElementById('overlay-finish-content');
+    const currentCountEl = document.getElementById('current-count');
+    const progressBar = document.getElementById('progress-bar');
+    const statusBadge = document.getElementById('status-badge');
+    const historyBadgeCount = document.getElementById('history-badge-count');
+    const modalCounter = document.getElementById('modal-counter');
+    const historyList = document.getElementById('history-list');
+    const historyModal = document.getElementById('history-modal');
+    const resetModal = document.getElementById('reset-modal');
+    const lastSelectionBadge = document.getElementById('last-selection-badge');
+
+    // 키패드 버튼 동적 렌더링 (1안 햅틱 디테일)
+    function renderKeypad() {
+      keypadGrid.innerHTML = '';
+      COLOR_PALETTE.forEach(color => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `keypad-btn relative w-full h-full rounded-2xl bg-gradient-to-b ${color.bg} ${color.border} ${color.text} flex flex-col items-center justify-center shadow-lg active:shadow-sm`;
+        btn.innerHTML = `
+          <span class="w-2 h-2 rounded-full ${color.dot} opacity-80 mb-1.5 shadow-sm"></span>
+          <span class="text-[17px] font-extrabold tracking-tight drop-shadow-sm pointer-events-none">${color.name}</span>
+        `;
+        btn.addEventListener('click', () => recordColor(color));
+        keypadGrid.appendChild(btn);
+      });
+    }
+
+    // 눈꽃 배경 효과 생성
+    function createSnowflakes() {
+      const snowContainer = document.getElementById('snow-layer');
+      const count = 24;
+      for (let i = 0; i < count; i++) {
+        const snowflake = document.createElement('div');
+        snowflake.classList.add('snowflake');
+        const size = Math.random() * 2.8 + 1.8;
+        snowflake.style.width = `${size}px`;
+        snowflake.style.height = `${size}px`;
+        snowflake.style.left = `${Math.random() * 100}vw`;
+        snowflake.style.animationDuration = `${Math.random() * 6 + 6}s`;
+        snowflake.style.animationDelay = `${Math.random() * 5}s`;
+        snowContainer.appendChild(snowflake);
+      }
+    }
+
+    // 게임 시작
+    function startGame() {
+      isGameActive = true;
+      lockOverlay.classList.add('hidden');
+      statusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span><span>진행 중</span>';
+      statusBadge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+    }
+
+    // 색상 기록 (효과음 없음, 햅틱 진동 지원)
+    function recordColor(color) {
+      if (!isGameActive || selectedColors.length >= MAX_SELECTIONS) return;
+
+      if (navigator.vibrate) {
+        navigator.vibrate(15);
+      }
+
+      selectedColors.push(color);
+      updateUI();
+
+      if (selectedColors.length === MAX_SELECTIONS) {
+        finishGame();
+      }
+    }
+
+    // 게임 종료 및 오버레이 잠금
+    function finishGame() {
+      isGameActive = false;
+      overlayStartContent.classList.add('hidden');
+      overlayFinishContent.classList.remove('hidden');
+      lockOverlay.classList.remove('hidden');
+
+      statusBadge.innerHTML = '<span>🎄</span><span>제출 완료</span>';
+      statusBadge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1';
+
+      if (navigator.vibrate) {
+        navigator.vibrate([25, 30, 40]);
+      }
+    }
+
+    // UI 상태 갱신
+    function updateUI() {
+      const count = selectedColors.length;
+      currentCountEl.textContent = count;
+      historyBadgeCount.textContent = count;
+      modalCounter.textContent = `${count} / ${MAX_SELECTIONS}`;
+
+      const percent = (count / MAX_SELECTIONS) * 100;
+      progressBar.style.width = `${percent}%`;
+
+      // 최근 입력 배지 갱신
+      if (count > 0) {
+        const last = selectedColors[count - 1];
+        lastSelectionBadge.textContent = `#${count} ${last.name}`;
+        lastSelectionBadge.className = `px-2 py-0.5 rounded-full font-bold ${last.text} text-[10px] shadow-sm`;
+        lastSelectionBadge.style.backgroundColor = last.hex;
+      } else {
+        lastSelectionBadge.textContent = '없음';
+        lastSelectionBadge.className = 'px-2 py-0.5 rounded-full font-bold bg-white/10 text-white/50 text-[10px]';
+        lastSelectionBadge.style.backgroundColor = 'transparent';
+      }
+
+      renderHistory();
+    }
+
+    // 입력 내역 렌더링
+    function renderHistory() {
+      if (selectedColors.length === 0) {
+        historyList.innerHTML = `
+          <div class="py-12 text-center text-slate-400">
+            <span>아직 입력된 색상이 없습니다.</span>
+          </div>
+        `;
+        return;
+      }
+
+      historyList.innerHTML = selectedColors.map((color, idx) => `
+        <div class="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 border border-white/5">
+          <div class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-lg bg-white/10 text-slate-300 font-bold flex items-center justify-center text-[11px] font-mono">
+              ${idx + 1}
+            </span>
+            <span class="w-3.5 h-3.5 rounded-full bg-gradient-to-b ${color.bg} border border-white/20 shadow-sm"></span>
+            <span class="font-bold text-white text-[13px]">${color.name}</span>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono tracking-wider">#${String(idx + 1).padStart(2, '0')}</span>
+        </div>
+      `).join('');
+    }
+
+    // 모달 제어
+    function toggleHistoryModal() {
+      renderHistory();
+      historyModal.classList.toggle('hidden');
+      historyModal.classList.toggle('flex');
+    }
+
+    function openResetModal() {
+      resetModal.classList.remove('hidden');
+      resetModal.classList.add('flex');
+    }
+
+    function closeResetModal() {
+      resetModal.classList.add('hidden');
+      resetModal.classList.remove('flex');
+    }
+
+    function confirmReset() {
+      selectedColors = [];
+      isGameActive = false;
+      closeResetModal();
+
+      overlayStartContent.classList.remove('hidden');
+      overlayFinishContent.classList.add('hidden');
+      lockOverlay.classList.remove('hidden');
+
+      statusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span><span>대기 중</span>';
+      statusBadge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1';
+
+      updateUI();
+    }
+
+    // 초기화
+    window.onload = function() {
+      createSnowflakes();
+      renderKeypad();
+      updateUI();
+    };
+  </script>
+</body>
+</html>
