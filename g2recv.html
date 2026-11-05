@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>에이징 테스트 G2 - 플레이어 입력기</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pretendard Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * {
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: radial-gradient(circle at 50% 12%, #193d28 0%, #0d2317 55%, #05130b 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+      touch-action: manipulation;
+    }
+    /* 3x3 햅틱 키패드 버튼 스타일 */
+    .num-btn {
+      touch-action: manipulation;
+      transition: transform 0.05s ease-out, filter 0.05s ease-out, border-bottom-width 0.05s ease-out;
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      border-bottom-width: 4px;
+      box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.5);
+    }
+    .num-btn:active:not(:disabled) {
+      transform: translateY(3px);
+      border-bottom-width: 1px;
+      filter: brightness(0.92);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    }
+    .num-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      filter: grayscale(60%);
+    }
+    /* 은은한 눈꽃 파티클 효과 */
+    .snowflake {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.2;
+      animation: snowfall linear infinite;
+    }
+    @keyframes snowfall {
+      0% { transform: translateY(-8px) translateX(0); opacity: 0; }
+      15% { opacity: 0.3; }
+      85% { opacity: 0.25; }
+      100% { transform: translateY(105vh) translateX(15px); opacity: 0; }
+    }
+    /* 스크롤바 정돈 */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-3.5 sm:p-5 max-w-md mx-auto relative overflow-x-hidden">
+
+  <!-- 은은한 눈꽃 배경 레이어 -->
+  <div id="snow-layer" class="fixed inset-0 overflow-hidden pointer-events-none z-0"></div>
+
+  <!-- ================= 헤더 영역 (미니멀 & 단일화) ================= -->
+  <header class="w-full flex flex-col items-center pt-2 pb-1.5 z-10 text-center">
+    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/35 text-emerald-300 text-xs font-semibold tracking-wider mb-1.5 shadow-sm">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      에이징 테스트 G2
+    </div>
+    <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-1.5">
+      <span>🔢</span>
+      <span>키패드 순서 기억</span>
+    </h1>
+    <p class="text-xs text-emerald-200/75 mt-0.5 font-medium">
+      화면에서 번쩍인 숫자의 순서를 그대로 입력하세요
+    </p>
+  </header>
+
+  <!-- ================= 메인 영역: 상태바 & 입력 디스플레이 & 3x3 키패드 ================= -->
+  <main class="w-full flex-1 flex flex-col justify-center my-auto z-10 space-y-3">
+    
+    <!-- 스테이지 및 자릿수 현황 카드 -->
+    <div class="bg-black/35 backdrop-blur-md border border-white/10 rounded-2xl p-3 shadow-xl">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span id="stage-badge" class="px-2.5 py-0.5 text-xs font-black rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/40 font-mono">
+            St 1
+          </span>
+          <span id="stage-status-text" class="text-xs font-semibold text-slate-300">순서 입력 대기</span>
+        </div>
+        <div class="text-sm font-black tracking-wide font-mono">
+          <span id="input-count" class="text-emerald-400 text-lg">0</span>
+          <span id="max-count" class="text-slate-400">/ 3</span>
+        </div>
+      </div>
+
+      <!-- 입력된 숫자 슬롯 뷰 (실시간 나열) -->
+      <div class="w-full min-h-[44px] bg-black/40 rounded-xl p-2 border border-white/10 flex items-center gap-1.5 overflow-x-auto" id="slots-container">
+        <!-- JS로 슬롯이 생성됩니다 -->
+      </div>
+    </div>
+
+    <!-- 3x3 키패드 컨테이너 -->
+    <div class="relative w-full aspect-square bg-black/30 backdrop-blur-md rounded-3xl border border-white/10 p-3 shadow-2xl flex items-center justify-center">
+      
+      <!-- 스테이지 완료 / 전체 게임 마감 오버레이 락 -->
+      <div id="stage-lock-overlay" class="absolute inset-0 z-20 bg-black/85 backdrop-blur-md rounded-3xl hidden flex-col items-center justify-center p-6 text-center">
+        
+        <!-- 개별 스테이지 완료 시 노출 -->
+        <div id="overlay-next-stage" class="hidden flex-col items-center w-full max-w-xs">
+          <div class="w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center text-3xl mb-2.5 shadow-inner">
+            ✨
+          </div>
+          <h2 id="stage-clear-title" class="text-lg font-bold text-white mb-1">St 1 입력 완료!</h2>
+          <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+            해당 스테이지의 모든 자릿수를 입력했습니다.<br />진행자 안내에 따라 다음 스테이지로 넘어가세요.
+          </p>
+          <button id="btn-advance-stage" onclick="advanceToNextStage()" class="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-sm tracking-wide shadow-xl shadow-emerald-950/60 active:scale-95 transition-all border-t border-emerald-300/40">
+            다음 스테이지로 이동
+          </button>
+        </div>
+
+        <!-- 최종 전체 완료 시 노출 -->
+        <div id="overlay-final-finish" class="hidden flex-col items-center w-full max-w-xs">
+          <div class="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-500/30 to-yellow-500/20 border border-amber-400/40 flex items-center justify-center text-3xl mb-2.5">
+            🎉
+          </div>
+          <h2 class="text-xl font-extrabold text-white mb-1">모든 스테이지 완료!</h2>
+          <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+            St 1, St 2, St 3 입력이 모두 끝났습니다.<br />스태프에게 답안 검수를 요청하세요.
+          </p>
+          <button onclick="openVerificationModal()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-sm shadow-lg active:scale-95 transition-all">
+            📋 답안 검수표 열기
+          </button>
+        </div>
+
+      </div>
+
+      <!-- 1 ~ 9 순수 3x3 숫자 키패드 (0번 없음) -->
+      <div id="keypad-grid" class="w-full h-full grid grid-cols-3 gap-2.5">
+        <!-- 9개 숫자 버튼이 렌더링됩니다 -->
+      </div>
+    </div>
+
+    <!-- 하단 팁 문구 -->
+    <p class="text-center text-[11px] text-slate-400/80 font-medium">
+      ※ 한 번 누른 숫자는 수정할 수 없으니 신중하게 기억하여 누르세요.
+    </p>
+  </main>
+
+  <!-- ================= 하단 액션 버튼 바 ================= -->
+  <footer class="w-full pt-2 pb-2 z-10 flex flex-col items-center gap-2">
+    <div class="w-full flex items-center justify-between gap-2.5">
+      <!-- 답안 검수 모달 버튼 -->
+      <button onclick="openVerificationModal()" class="flex-1 py-3 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-bold text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+        <span>📋</span>
+        <span>답안 검수</span>
+      </button>
+
+      <!-- 리셋 버튼 -->
+      <button onclick="openResetModal()" class="py-3 px-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+        <span>🔄</span>
+        <span>리셋</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- ================= 답안 검수 모달 (진행자 답안 형식과 1:1 일치) ================= -->
+  <div id="verify-modal" class="fixed inset-0 z-40 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl overflow-hidden">
+      
+      <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span class="text-amber-400">📋</span>
+          <span>플레이어 제출 답안</span>
+        </h3>
+        <button onclick="closeVerificationModal()" class="text-slate-400 hover:text-white text-xl leading-none p-1">✕</button>
+      </div>
+
+      <!-- 진행자 팝업 규격과 동일한 st1, st2, st3 노출 -->
+      <div class="p-4 space-y-3 font-mono text-xs">
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-400">st1 (3자리)</span>
+            <span id="modal-st1-count" class="text-[10px] text-slate-400">0 / 3</span>
+          </div>
+          <span id="modal-ans-st1" class="text-white font-bold text-sm tracking-widest break-all">
+            (미입력)
+          </span>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-400">st2 (7자리)</span>
+            <span id="modal-st2-count" class="text-[10px] text-slate-400">0 / 7</span>
+          </div>
+          <span id="modal-ans-st2" class="text-white font-bold text-sm tracking-widest break-all">
+            (미입력)
+          </span>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-400">st3 (12자리)</span>
+            <span id="modal-st3-count" class="text-[10px] text-slate-400">0 / 12</span>
+          </div>
+          <span id="modal-ans-st3" class="text-white font-bold text-sm tracking-widest break-all">
+            (미입력)
+          </span>
+        </div>
+      </div>
+
+      <div class="p-3 border-t border-white/10 bg-white/5">
+        <button onclick="closeVerificationModal()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md active:scale-95">
+          확인 완료 (닫기)
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= 초기화(리셋) 확인 모달 ================= -->
+  <div id="reset-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-xs p-5 text-center shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 mx-auto flex items-center justify-center text-2xl mb-3">
+        ⚠️
+      </div>
+      <h3 class="text-base font-bold text-white mb-1.5">모든 기록을 초기화할까요?</h3>
+      <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+        St 1부터 St 3까지 입력한 모든 답안이 삭제되고<br />처음 상태로 되돌아갑니다.
+      </p>
+      <div class="flex items-center gap-2.5">
+        <button onclick="closeResetModal()" class="flex-1 py-2.5 rounded-xl bg-white/10 text-xs font-semibold text-slate-300 hover:bg-white/15 active:scale-95 transition-all">
+          취소
+        </button>
+        <button onclick="confirmReset()" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white active:scale-95 transition-all shadow-lg shadow-rose-950">
+          초기화
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 스크립트 로직 ================= -->
+  <script>
+    // 스테이지별 필수 자릿수 규격
+    const STAGE_RULES = [
+      { stage: 1, limit: 3, label: 'St 1' },
+      { stage: 2, limit: 7, label: 'St 2' },
+      { stage: 3, limit: 12, label: 'St 3' }
+    ];
+
+    let currentStageIndex = 0;
+    // 세 스테이지별 플레이어 입력 데이터 저장소
+    const playerInputs = [[], [], []];
+
+    // DOM 캐싱
+    const stageBadge = document.getElementById('stage-badge');
+    const stageStatusText = document.getElementById('stage-status-text');
+    const inputCountEl = document.getElementById('input-count');
+    const maxCountEl = document.getElementById('max-count');
+    const slotsContainer = document.getElementById('slots-container');
+    const keypadGrid = document.getElementById('keypad-grid');
+
+    const stageLockOverlay = document.getElementById('stage-lock-overlay');
+    const overlayNextStage = document.getElementById('overlay-next-stage');
+    const overlayFinalFinish = document.getElementById('overlay-final-finish');
+    const stageClearTitle = document.getElementById('stage-clear-title');
+
+    const verifyModal = document.getElementById('verify-modal');
+    const modalAnsSt1 = document.getElementById('modal-ans-st1');
+    const modalAnsSt2 = document.getElementById('modal-ans-st2');
+    const modalAnsSt3 = document.getElementById('modal-ans-st3');
+    const modalSt1Count = document.getElementById('modal-st1-count');
+    const modalSt2Count = document.getElementById('modal-st2-count');
+    const modalSt3Count = document.getElementById('modal-st3-count');
+    const resetModal = document.getElementById('reset-modal');
+
+    // 1 ~ 9 숫자 키패드 렌더링
+    function renderKeypad() {
+      keypadGrid.innerHTML = '';
+      for (let i = 1; i <= 9; i++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = `input-btn-${i}`;
+        btn.className = `num-btn relative w-full h-full rounded-2xl bg-gradient-to-b from-[#243f30] to-[#14261d] border-b-[#0b1711] text-amber-300 font-mono text-3xl font-black flex items-center justify-center active:bg-emerald-900/60 shadow-lg`;
+        btn.textContent = i;
+        btn.addEventListener('click', () => recordNumber(i));
+        keypadGrid.appendChild(btn);
+      }
+    }
+
+    // 눈꽃 배경 효과
+    function createSnowflakes() {
+      const snowContainer = document.getElementById('snow-layer');
+      const count = 22;
+      for (let i = 0; i < count; i++) {
+        const snowflake = document.createElement('div');
+        snowflake.classList.add('snowflake');
+        const size = Math.random() * 2.5 + 1.5;
+        snowflake.style.width = `${size}px`;
+        snowflake.style.height = `${size}px`;
+        snowflake.style.left = `${Math.random() * 100}vw`;
+        snowflake.style.animationDuration = `${Math.random() * 6 + 6}s`;
+        snowflake.style.animationDelay = `${Math.random() * 5}s`;
+        snowContainer.appendChild(snowflake);
+      }
+    }
+
+    // 숫자 터치 입력
+    function recordNumber(num) {
+      const rule = STAGE_RULES[currentStageIndex];
+      const currList = playerInputs[currentStageIndex];
+
+      if (currList.length >= rule.limit) return;
+
+      currList.push(num);
+
+      if (navigator.vibrate) {
+        navigator.vibrate(12);
+      }
+
+      updateStageUI();
+
+      // 자릿수 도달 시 즉시 락 & 모달 처리
+      if (currList.length === rule.limit) {
+        handleStageCompletion();
+      }
+    }
+
+    // 스테이지 완료 처리
+    function handleStageCompletion() {
+      const rule = STAGE_RULES[currentStageIndex];
+      stageLockOverlay.classList.remove('hidden');
+      stageLockOverlay.classList.add('flex');
+
+      if (currentStageIndex < STAGE_RULES.length - 1) {
+        // 다음 스테이지로 안내
+        overlayNextStage.classList.remove('hidden');
+        overlayNextStage.classList.add('flex');
+        overlayFinalFinish.classList.add('hidden');
+        stageClearTitle.textContent = `${rule.label} 입력 완료!`;
+      } else {
+        // 3단계 모두 완료
+        overlayNextStage.classList.add('hidden');
+        overlayFinalFinish.classList.remove('hidden');
+        overlayFinalFinish.classList.add('flex');
+      }
+    }
+
+    // 다음 스테이지 진입
+    function advanceToNextStage() {
+      if (currentStageIndex < STAGE_RULES.length - 1) {
+        currentStageIndex++;
+        stageLockOverlay.classList.add('hidden');
+        stageLockOverlay.classList.remove('flex');
+        overlayNextStage.classList.add('hidden');
+        updateStageUI();
+      }
+    }
+
+    // UI 동기화 및 슬롯 렌더링
+    function updateStageUI() {
+      const rule = STAGE_RULES[currentStageIndex];
+      const currList = playerInputs[currentStageIndex];
+
+      stageBadge.textContent = rule.label;
+      inputCountEl.textContent = currList.length;
+      maxCountEl.textContent = `/ ${rule.limit}`;
+
+      if (currList.length === rule.limit) {
+        stageStatusText.textContent = '입력 마감';
+        stageStatusText.className = 'text-xs font-semibold text-emerald-400';
+      } else {
+        stageStatusText.textContent = '순서 입력 진행 중';
+        stageStatusText.className = 'text-xs font-semibold text-slate-300';
+      }
+
+      // 슬롯 뷰 렌더링
+      slotsContainer.innerHTML = '';
+      for (let i = 0; i < rule.limit; i++) {
+        const slot = document.createElement('div');
+        if (i < currList.length) {
+          slot.className = 'min-w-[28px] h-8 rounded-lg bg-amber-400/20 border border-amber-400/50 text-amber-300 font-mono font-black text-sm flex items-center justify-center shadow-inner';
+          slot.textContent = currList[i];
+        } else {
+          slot.className = 'min-w-[28px] h-8 rounded-lg bg-white/5 border border-white/10 text-white/20 font-mono text-xs flex items-center justify-center';
+          slot.textContent = i + 1;
+        }
+        slotsContainer.appendChild(slot);
+      }
+    }
+
+    // ================= 검수표 모달 동기화 =================
+    function openVerificationModal() {
+      const formatAns = (list) => list.length > 0 ? list.join(' - ') : '(미입력)';
+
+      modalAnsSt1.textContent = formatAns(playerInputs[0]);
+      modalAnsSt2.textContent = formatAns(playerInputs[1]);
+      modalAnsSt3.textContent = formatAns(playerInputs[2]);
+
+      modalSt1Count.textContent = `${playerInputs[0].length} / 3`;
+      modalSt2Count.textContent = `${playerInputs[1].length} / 7`;
+      modalSt3Count.textContent = `${playerInputs[2].length} / 12`;
+
+      verifyModal.classList.remove('hidden');
+      verifyModal.classList.add('flex');
+    }
+
+    function closeVerificationModal() {
+      verifyModal.classList.add('hidden');
+      verifyModal.classList.remove('flex');
+    }
+
+    // ================= 리셋 모달 =================
+    function openResetModal() {
+      resetModal.classList.remove('hidden');
+      resetModal.classList.add('flex');
+    }
+
+    function closeResetModal() {
+      resetModal.classList.add('hidden');
+      resetModal.classList.remove('flex');
+    }
+
+    function confirmReset() {
+      playerInputs[0] = [];
+      playerInputs[1] = [];
+      playerInputs[2] = [];
+      currentStageIndex = 0;
+
+      stageLockOverlay.classList.add('hidden');
+      stageLockOverlay.classList.remove('flex');
+      overlayNextStage.classList.add('hidden');
+      overlayFinalFinish.classList.add('hidden');
+
+      closeResetModal();
+      updateStageUI();
+    }
+
+    // 윈도우 로드 초기화
+    window.onload = function() {
+      createSnowflakes();
+      renderKeypad();
+      updateStageUI();
+    };
+  </script>
+</body>
+</html>
