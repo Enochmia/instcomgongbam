@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>에이징 테스트 - 플레이어 기록기</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pretendard Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * {
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    body {
+      background: radial-gradient(circle at 50% 12%, #193d28 0%, #0d2317 55%, #05130b 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+      touch-action: manipulation;
+    }
+
+    /* G1 햅틱 입체 키패드 스타일 */
+    .keypad-btn {
+      touch-action: manipulation;
+      transition: transform 0.05s ease-out, border-bottom-width 0.05s ease-out, filter 0.05s ease-out;
+      border-top: 1px solid rgba(255, 255, 255, 0.42);
+      border-bottom-width: 4px;
+      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
+    }
+    .keypad-btn:active {
+      transform: translateY(3px);
+      border-bottom-width: 1px;
+      filter: brightness(0.97);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    /* G2 햅틱 입체 키패드 스타일 */
+    .num-btn {
+      touch-action: manipulation;
+      transition: transform 0.05s ease-out, filter 0.05s ease-out, border-bottom-width 0.05s ease-out;
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      border-bottom-width: 4px;
+      box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.5);
+    }
+    .num-btn:active:not(:disabled) {
+      transform: translateY(3px);
+      border-bottom-width: 1px;
+      filter: brightness(0.92);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    }
+    .num-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      filter: grayscale(60%);
+    }
+
+    /* 은은한 배경 눈꽃 효과 */
+    .snowflake {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.22;
+      animation: snowfall linear infinite;
+    }
+    @keyframes snowfall {
+      0% { transform: translateY(-8px) translateX(0); opacity: 0; }
+      15% { opacity: 0.3; }
+      85% { opacity: 0.25; }
+      100% { transform: translateY(105vh) translateX(18px); opacity: 0; }
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-3 sm:p-5 max-w-md mx-auto relative overflow-x-hidden">
+
+  <!-- 눈꽃 레이어 -->
+  <div id="snow-layer" class="fixed inset-0 overflow-hidden pointer-events-none z-0"></div>
+
+  <!-- ================= 1. 게임 선택 버튼 & 2. 라운드 선택 버튼 ================= -->
+  <nav class="w-full pt-1 pb-1 z-30 flex flex-col gap-1.5">
+    <!-- 게임 선택 (G1 / G2) -->
+    <div class="grid grid-cols-2 p-1 rounded-2xl bg-black/50 border border-white/10 backdrop-blur-md shadow-lg">
+      <button id="tab-btn-g1" onclick="switchGameTab('g1')" class="py-2 rounded-xl font-black text-xs sm:text-sm tracking-wide transition-all duration-150 flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md">
+        <span>🎨</span>
+        <span>G1 색깔 단어</span>
+      </button>
+      <button id="tab-btn-g2" onclick="switchGameTab('g2')" class="py-2 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all duration-150 flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+        <span>🔢</span>
+        <span>G2 키패드 기억</span>
+      </button>
+    </div>
+
+    <!-- 라운드 선택 (ROUND 1 / ROUND 2) -->
+    <div class="grid grid-cols-2 p-1 rounded-xl bg-black/40 border border-white/10 backdrop-blur-md shadow-md">
+      <button id="round-btn-r1" onclick="switchRoundTab(1)" class="py-1.5 rounded-lg font-black text-xs font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 bg-amber-400 text-slate-950 shadow-sm">
+        <span>⭐</span>
+        <span>ROUND 1</span>
+      </button>
+      <button id="round-btn-r2" onclick="switchRoundTab(2)" class="py-1.5 rounded-lg font-bold text-xs font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+        <span>✨</span>
+        <span>ROUND 2</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================== -->
+  <!--                      GAME 1 : 색깔 단어 게임                    -->
+  <!-- ============================================================== -->
+  <section id="view-g1" class="w-full flex-1 flex flex-col justify-between z-10">
+    <header class="w-full flex flex-col items-center pt-1 pb-1.5 text-center">
+      <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/35 text-emerald-300 text-[11px] font-semibold tracking-wider mb-1 shadow-sm font-mono">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="g1-header-badge">G1 / ROUND 1</span>
+      </div>
+      <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-1.5">
+        <span>🎨</span>
+        <span>색깔 단어 게임</span>
+      </h1>
+      <p class="text-xs text-emerald-200/75 mt-0.5 font-medium">
+        화면에 제시되는 단어의 <span class="text-amber-300 font-bold underline underline-offset-2">글자 색상</span>을 기록하세요
+      </p>
+    </header>
+
+    <main class="w-full flex-1 flex flex-col justify-center my-auto space-y-2.5">
+      <!-- 현황판 -->
+      <div class="bg-black/35 backdrop-blur-md border border-white/10 rounded-2xl p-3 shadow-xl">
+        <div class="flex items-center justify-between mb-1.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-300">기록 현황</span>
+            <span id="g1-status-badge" class="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>대기 중</span>
+            </span>
+          </div>
+          <div class="text-sm font-black tracking-wide font-mono">
+            <span id="g1-current-count" class="text-emerald-400 text-lg">0</span>
+            <span class="text-slate-400">/ 15</span>
+          </div>
+        </div>
+
+        <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden p-0.5 border border-white/5">
+          <div id="g1-progress-bar" class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-150 rounded-full w-0"></div>
+        </div>
+      </div>
+
+      <!-- 3x3 키패드 -->
+      <div class="relative w-full aspect-square bg-black/30 backdrop-blur-md rounded-3xl border border-white/10 p-3 shadow-2xl flex items-center justify-center">
+        <!-- 락 오버레이 -->
+        <div id="g1-lock-overlay" class="absolute inset-0 z-20 bg-black/85 backdrop-blur-md rounded-3xl flex flex-col items-center justify-center p-6 text-center transition-all duration-200">
+          <div id="g1-overlay-start-content" class="flex flex-col items-center w-full max-w-xs">
+            <div class="w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center text-3xl mb-2.5 shadow-inner">
+              🔔
+            </div>
+            <h2 id="g1-overlay-title" class="text-lg font-bold text-white mb-1">ROUND 1 준비되셨나요?</h2>
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+              진행자의 신호에 맞춰 시작 버튼을 누르면<br /><span class="text-amber-300 font-semibold">색상 키패드</span>가 활성화됩니다.
+            </p>
+            <button onclick="startG1Game()" class="w-full py-2.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-sm tracking-wide shadow-xl shadow-emerald-950/60 hover:brightness-110 active:scale-95 transition-all border-t border-emerald-300/40">
+              게임 시작하기
+            </button>
+          </div>
+
+          <div id="g1-overlay-finish-content" class="hidden flex flex-col items-center w-full max-w-xs">
+            <div class="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-500/30 to-yellow-500/20 border border-amber-400/40 flex items-center justify-center text-3xl mb-2.5">
+              ✨
+            </div>
+            <h2 class="text-lg font-extrabold text-white mb-1">15개 입력 완료!</h2>
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+              모든 단어 색상 입력이 마감되었습니다.<br />하단의 검수 버튼을 눌러 점수를 확인하세요.
+            </p>
+            <button onclick="toggleG1HistoryModal()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-sm shadow-lg active:scale-95 transition-all">
+              📋 정답 및 채점 확인
+            </button>
+          </div>
+        </div>
+
+        <div id="g1-keypad-grid" class="w-full h-full grid grid-cols-3 gap-2.5"></div>
+      </div>
+
+      <div class="flex items-center justify-between px-1 text-[11px] text-slate-400">
+        <div class="flex items-center gap-1.5">
+          <span>최근 터치:</span>
+          <span id="g1-last-selection-badge" class="px-2 py-0.5 rounded-full font-bold bg-white/10 text-white/50 text-[10px]">없음</span>
+        </div>
+        <span>※ 한 번 누른 색상은 수정 불가</span>
+      </div>
+    </main>
+
+    <footer class="w-full pt-1.5 pb-1 flex flex-col items-center gap-2">
+      <div class="w-full flex items-center justify-between gap-2.5">
+        <button onclick="toggleG1HistoryModal()" class="flex-1 py-2.5 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-bold text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+          <span>📋</span>
+          <span>입력 내역 및 채점 (<span id="g1-history-badge-count" class="text-amber-300 font-mono font-bold">0</span>)</span>
+        </button>
+
+        <button onclick="openG1ResetModal()" class="py-2.5 px-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+          <span>🔄</span>
+          <span>리셋</span>
+        </button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- ============================================================== -->
+  <!--                   GAME 2 : 키패드 순서 기억                     -->
+  <!-- ============================================================== -->
+  <section id="view-g2" class="w-full flex-1 flex flex-col justify-between z-10 hidden">
+    <header class="w-full flex flex-col items-center pt-1 pb-1 text-center">
+      <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/35 text-emerald-300 text-[11px] font-semibold tracking-wider mb-1 shadow-sm font-mono">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="g2-header-badge">G2 / ROUND 1</span>
+      </div>
+      <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-1.5">
+        <span>🔢</span>
+        <span>키패드 순서 기억</span>
+      </h1>
+      <p class="text-xs text-emerald-200/75 mt-0.5 font-medium">
+        화면에서 번쩍인 숫자의 순서를 그대로 입력하세요
+      </p>
+    </header>
+
+    <main class="w-full flex-1 flex flex-col justify-center my-auto space-y-2.5">
+      <div class="bg-black/35 backdrop-blur-md border border-white/10 rounded-2xl p-3 shadow-xl">
+        <div class="flex items-center justify-between mb-1.5">
+          <div class="flex items-center gap-2">
+            <span id="g2-stage-badge" class="px-2.5 py-0.5 text-xs font-black rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/40 font-mono">
+              St 1
+            </span>
+            <span id="g2-stage-status-text" class="text-xs font-semibold text-slate-300">순서 입력 대기</span>
+          </div>
+          <div class="text-sm font-black tracking-wide font-mono">
+            <span id="g2-input-count" class="text-emerald-400 text-lg">0</span>
+            <span id="g2-max-count" class="text-slate-400">/ 3</span>
+          </div>
+        </div>
+
+        <div class="w-full min-h-[40px] bg-black/40 rounded-xl p-1.5 border border-white/10 flex items-center gap-1.5 overflow-x-auto" id="g2-slots-container"></div>
+      </div>
+
+      <div class="relative w-full aspect-square bg-black/30 backdrop-blur-md rounded-3xl border border-white/10 p-3 shadow-2xl flex items-center justify-center">
+        <div id="g2-stage-lock-overlay" class="absolute inset-0 z-20 bg-black/85 backdrop-blur-md rounded-3xl hidden flex-col items-center justify-center p-6 text-center">
+          <div id="g2-overlay-next-stage" class="hidden flex-col items-center w-full max-w-xs">
+            <div class="w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center text-3xl mb-2.5 shadow-inner">
+              ✨
+            </div>
+            <h2 id="g2-stage-clear-title" class="text-lg font-bold text-white mb-1">St 1 입력 완료!</h2>
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+              해당 스테이지의 모든 자릿수를 입력했습니다.<br />진행자 안내에 따라 다음 스테이지로 넘어가세요.
+            </p>
+            <button onclick="advanceG2NextStage()" class="w-full py-2.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-sm tracking-wide shadow-xl shadow-emerald-950/60 active:scale-95 transition-all border-t border-emerald-300/40">
+              다음 스테이지로 이동
+            </button>
+          </div>
+
+          <div id="g2-overlay-final-finish" class="hidden flex-col items-center w-full max-w-xs">
+            <div class="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-500/30 to-yellow-500/20 border border-amber-400/40 flex items-center justify-center text-3xl mb-2.5">
+              🎉
+            </div>
+            <h2 class="text-xl font-extrabold text-white mb-1">모든 스테이지 완료!</h2>
+            <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+              St 1, St 2, St 3 입력이 모두 끝났습니다.<br />스태프에게 검수표를 보여주세요.
+            </p>
+            <button onclick="openG2VerificationModal()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-sm shadow-lg active:scale-95 transition-all">
+              📋 답안 검수표 열기
+            </button>
+          </div>
+        </div>
+
+        <div id="g2-keypad-grid" class="w-full h-full grid grid-cols-3 gap-2.5"></div>
+      </div>
+
+      <p class="text-center text-[11px] text-slate-400/80 font-medium">
+        ※ 한 번 누른 숫자는 수정할 수 없으니 신중하게 기억하여 누르세요.
+      </p>
+    </main>
+
+    <footer class="w-full pt-1.5 pb-1 flex flex-col items-center gap-2">
+      <div class="w-full flex items-center justify-between gap-2.5">
+        <button onclick="openG2VerificationModal()" class="flex-1 py-2.5 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-bold text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+          <span>📋</span>
+          <span>답안 검수 및 채점</span>
+        </button>
+
+        <button onclick="openG2ResetModal()" class="py-2.5 px-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+          <span>🔄</span>
+          <span>리셋</span>
+        </button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- ================= G1 검수 & 자동 채점 모달 ================= -->
+  <div id="g1-history-modal" class="fixed inset-0 z-40 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-sm max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-3.5 border-b border-white/10 flex items-center justify-between bg-white/5">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-400">📋</span>
+          <h3 class="text-sm font-bold text-white">G1 검수표 (<span id="g1-modal-round-tag" class="font-mono text-amber-300">R1</span>)</h3>
+        </div>
+        <div id="g1-score-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold text-xs">
+          0 / 15 점
+        </div>
+        <button onclick="toggleG1HistoryModal()" class="text-slate-400 hover:text-white text-xl leading-none p-1">✕</button>
+      </div>
+      <div id="g1-history-list" class="p-3 overflow-y-auto space-y-1.5 flex-1 text-xs font-mono"></div>
+      <div class="p-3 border-t border-white/10 bg-white/5">
+        <button onclick="toggleG1HistoryModal()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md active:scale-95">
+          확인 완료 (닫기)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- G1 리셋 모달 -->
+  <div id="g1-reset-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-xs p-5 text-center shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 mx-auto flex items-center justify-center text-2xl mb-3">⚠️</div>
+      <h3 class="text-base font-bold text-white mb-1.5">G1 현재 라운드 초기화</h3>
+      <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+        선택된 라운드의 모든 답안이 삭제되고<br />게임 시작 전 대기 상태로 되돌아갑니다.
+      </p>
+      <div class="flex items-center gap-2.5">
+        <button onclick="closeG1ResetModal()" class="flex-1 py-2 rounded-xl bg-white/10 text-xs font-semibold text-slate-300 hover:bg-white/15 active:scale-95 transition-all">취소</button>
+        <button onclick="confirmG1Reset()" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white active:scale-95 transition-all shadow-lg shadow-rose-950">초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= G2 검수 & 자동 채점 모달 ================= -->
+  <div id="g2-verify-modal" class="fixed inset-0 z-40 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl overflow-hidden max-h-[85vh]">
+      <div class="p-3.5 border-b border-white/10 flex items-center justify-between bg-white/5">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-400">📋</span>
+          <h3 class="text-sm font-bold text-white">G2 검수표 (<span id="g2-modal-round-tag" class="font-mono text-amber-300">R1</span>)</h3>
+        </div>
+        <div id="g2-score-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold text-xs">
+          0 / 22 점
+        </div>
+        <button onclick="closeG2VerificationModal()" class="text-slate-400 hover:text-white text-xl leading-none p-1">✕</button>
+      </div>
+      <div class="p-3.5 space-y-3 font-mono text-xs overflow-y-auto">
+        <!-- St1 -->
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-400">st1 (3자리)</span>
+            <span id="g2-modal-st1-score" class="text-[11px] font-bold text-amber-300">0 / 3 일치</span>
+          </div>
+          <div class="text-[11px] text-slate-400">내 답안: <span id="g2-modal-ans-st1" class="text-white font-bold tracking-wider">(미입력)</span></div>
+          <div class="text-[11px] text-slate-400">정&nbsp;&nbsp;&nbsp;답: <span id="g2-modal-target-st1" class="text-emerald-400 font-bold tracking-wider"></span></div>
+        </div>
+
+        <!-- St2 -->
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-400">st2 (7자리)</span>
+            <span id="g2-modal-st2-score" class="text-[11px] font-bold text-amber-300">0 / 7 일치</span>
+          </div>
+          <div class="text-[11px] text-slate-400">내 답안: <span id="g2-modal-ans-st2" class="text-white font-bold tracking-wider">(미입력)</span></div>
+          <div class="text-[11px] text-slate-400">정&nbsp;&nbsp;&nbsp;답: <span id="g2-modal-target-st2" class="text-amber-400 font-bold tracking-wider"></span></div>
+        </div>
+
+        <!-- St3 -->
+        <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-400">st3 (12자리)</span>
+            <span id="g2-modal-st3-score" class="text-[11px] font-bold text-amber-300">0 / 12 일치</span>
+          </div>
+          <div class="text-[11px] text-slate-400">내 답안: <span id="g2-modal-ans-st3" class="text-white font-bold tracking-wider">(미입력)</span></div>
+          <div class="text-[11px] text-slate-400">정&nbsp;&nbsp;&nbsp;답: <span id="g2-modal-target-st3" class="text-rose-400 font-bold tracking-wider"></span></div>
+        </div>
+      </div>
+      <div class="p-3 border-t border-white/10 bg-white/5">
+        <button onclick="closeG2VerificationModal()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md active:scale-95">
+          확인 완료 (닫기)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- G2 리셋 모달 -->
+  <div id="g2-reset-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-xs p-5 text-center shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 mx-auto flex items-center justify-center text-2xl mb-3">⚠️</div>
+      <h3 class="text-base font-bold text-white mb-1.5">G2 현재 라운드 초기화</h3>
+      <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+        선택된 라운드의 모든 스테이지 기록이 삭제되고<br />St 1 처음 상태로 되돌아갑니다.
+      </p>
+      <div class="flex items-center gap-2.5">
+        <button onclick="closeG2ResetModal()" class="flex-1 py-2 rounded-xl bg-white/10 text-xs font-semibold text-slate-300 hover:bg-white/15 active:scale-95 transition-all">취소</button>
+        <button onclick="confirmG2Reset()" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white active:scale-95 transition-all shadow-lg shadow-rose-950">초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =============================================================
+    // 0. 더블 탭 확대 완전 방어
+    // =============================================================
+    document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false });
+    let lastTouchTime = 0;
+    document.addEventListener('touchend', function(e) {
+      const now = Date.now();
+      if (now - lastTouchTime <= 300) { e.preventDefault(); }
+      lastTouchTime = now;
+    }, { passive: false });
+
+    // =============================================================
+    // 1. 하드코딩된 정답 데이터셋 (PDF 분석 결과 & G2 생성 정답)
+    // =============================================================
+    const HARDCODED_ANSWERS = {
+      g1: {
+        r1: [
+          '빨간색', '초록색', '검정색', '보라색', '주황색',
+          '파란색', '핑크색', '갈색', '검정색', '빨간색',
+          '노란색', '초록색', '핑크색', '검정색', '보라색'
+        ],
+        r2: [
+          '파란색', '노란색', '검정색', '핑크색', '초록색',
+          '갈색', '보라색', '검정색', '주황색', '노란색',
+          '파란색', '초록색', '빨간색', '검정색', '핑크색'
+        ]
+      },
+      g2: {
+        r1: {
+          st1: [4, 8, 2],
+          st2: [7, 1, 9, 3, 5, 8, 4],
+          st3: [6, 2, 9, 1, 5, 7, 3, 8, 4, 2, 9, 5]
+        },
+        r2: {
+          st1: [3, 7, 1],
+          st2: [5, 9, 2, 6, 4, 1, 8],
+          st3: [8, 4, 1, 7, 3, 9, 2, 6, 5, 8, 1, 4]
+        }
+      }
+    };
+
+    // 현재 선택된 게임 & 라운드 상태
+    let currentGame = 'g1';
+    let currentRound = 1;
+
+    // =============================================================
+    // 2. 탭 제어 (게임 & 라운드)
+    // =============================================================
+    function switchGameTab(target) {
+      currentGame = target;
+      const viewG1 = document.getElementById('view-g1');
+      const viewG2 = document.getElementById('view-g2');
+      const tabBtnG1 = document.getElementById('tab-btn-g1');
+      const tabBtnG2 = document.getElementById('tab-btn-g2');
+
+      if (target === 'g1') {
+        viewG1.classList.remove('hidden');
+        viewG2.classList.add('hidden');
+        tabBtnG1.className = 'py-2 rounded-xl font-black text-xs sm:text-sm tracking-wide transition-all duration-150 flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md';
+        tabBtnG2.className = 'py-2 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all duration-150 flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      } else {
+        viewG2.classList.remove('hidden');
+        viewG1.classList.add('hidden');
+        tabBtnG2.className = 'py-2 rounded-xl font-black text-xs sm:text-sm tracking-wide transition-all duration-150 flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md';
+        tabBtnG1.className = 'py-2 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all duration-150 flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      }
+      syncHeaders();
+    }
+
+    function switchRoundTab(roundNum) {
+      currentRound = roundNum;
+      const btnR1 = document.getElementById('round-btn-r1');
+      const btnR2 = document.getElementById('round-btn-r2');
+
+      if (roundNum === 1) {
+        btnR1.className = 'py-1.5 rounded-lg font-black text-xs font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 bg-amber-400 text-slate-950 shadow-sm';
+        btnR2.className = 'py-1.5 rounded-lg font-bold text-xs font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      } else {
+        btnR2.className = 'py-1.5 rounded-lg font-black text-xs font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 bg-amber-400 text-slate-950 shadow-sm';
+        btnR1.className = 'py-1.5 rounded-lg font-bold text-xs font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+      }
+      syncHeaders();
+      updateG1UI();
+      updateG2UI();
+    }
+
+    function syncHeaders() {
+      document.getElementById('g1-header-badge').textContent = `G1 / ROUND ${currentRound}`;
+      document.getElementById('g2-header-badge').textContent = `G2 / ROUND ${currentRound}`;
+      document.getElementById('g1-overlay-title').textContent = `ROUND ${currentRound} 준비되셨나요?`;
+    }
+
+    // =============================================================
+    // 3. GAME 1 : 색깔 단어 게임
+    // =============================================================
+    const G1_PALETTE = [
+      { id: 'red', name: '빨간색', bg: 'from-[#f87171] to-[#dc2626]', border: 'border-[#991b1b]', dot: 'bg-red-100', text: 'text-white', hex: '#dc2626' },
+      { id: 'orange', name: '주황색', bg: 'from-[#fb923c] to-[#ea580c]', border: 'border-[#9a3412]', dot: 'bg-orange-100', text: 'text-white', hex: '#ea580c' },
+      { id: 'yellow', name: '노란색', bg: 'from-[#fdf08a] to-[#f4dc47]', border: 'border-[#ca8a04]', dot: 'bg-yellow-100', text: 'text-slate-950', hex: '#f4dc47' },
+      { id: 'green', name: '초록색', bg: 'from-[#10b981] to-[#047857]', border: 'border-[#064e3b]', dot: 'bg-emerald-100', text: 'text-white', hex: '#047857' },
+      { id: 'blue', name: '파란색', bg: 'from-[#38bdf8] to-[#0284c7]', border: 'border-[#0369a1]', dot: 'bg-sky-100', text: 'text-white', hex: '#0284c7' },
+      { id: 'pink', name: '핑크색', bg: 'from-[#f472b6] to-[#db2777]', border: 'border-[#9d174d]', dot: 'bg-rose-100', text: 'text-white', hex: '#db2777' },
+      { id: 'purple', name: '보라색', bg: 'from-[#af8cf2] to-[#8854de]', border: 'border-[#6b21a8]', dot: 'bg-purple-100', text: 'text-white', hex: '#8854de' },
+      { id: 'brown', name: '갈색', bg: 'from-[#964b28] to-[#71320e]', border: 'border-[#431802]', dot: 'bg-amber-100', text: 'text-amber-50', hex: '#71320e' },
+      { id: 'black', name: '검정색', bg: 'from-[#323640] to-[#1c1e24]', border: 'border-[#0f1115]', dot: 'bg-slate-400', text: 'text-white', hex: '#1c1e24' }
+    ];
+
+    const G1_MAX = 15;
+    // 라운드별로 데이터 저장 (r1, r2)
+    const g1Data = {
+      1: { selected: [], isActive: false },
+      2: { selected: [], isActive: false }
+    };
+
+    function renderG1Keypad() {
+      const grid = document.getElementById('g1-keypad-grid');
+      grid.innerHTML = '';
+      G1_PALETTE.forEach(color => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `keypad-btn relative w-full h-full rounded-2xl bg-gradient-to-b ${color.bg} ${color.border} ${color.text} flex flex-col items-center justify-center shadow-lg active:shadow-sm`;
+        btn.innerHTML = `
+          <span class="w-2 h-2 rounded-full ${color.dot} opacity-80 mb-1 shadow-sm"></span>
+          <span class="text-[17px] font-extrabold tracking-tight drop-shadow-sm pointer-events-none">${color.name}</span>
+        `;
+        btn.addEventListener('click', () => recordG1Color(color));
+        grid.appendChild(btn);
+      });
+    }
+
+    function startG1Game() {
+      const state = g1Data[currentRound];
+      state.isActive = true;
+      document.getElementById('g1-lock-overlay').classList.add('hidden');
+      const badge = document.getElementById('g1-status-badge');
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span><span>진행 중</span>';
+      badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+    }
+
+    function recordG1Color(color) {
+      const state = g1Data[currentRound];
+      if (!state.isActive || state.selected.length >= G1_MAX) return;
+
+      if (navigator.vibrate) navigator.vibrate(15);
+      state.selected.push(color);
+      updateG1UI();
+
+      if (state.selected.length === G1_MAX) {
+        state.isActive = false;
+        document.getElementById('g1-overlay-start-content').classList.add('hidden');
+        document.getElementById('g1-overlay-finish-content').classList.remove('hidden');
+        document.getElementById('g1-lock-overlay').classList.remove('hidden');
+
+        const badge = document.getElementById('g1-status-badge');
+        badge.innerHTML = '<span>🎄</span><span>제출 완료</span>';
+        badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1';
+      }
+    }
+
+    function updateG1UI() {
+      const state = g1Data[currentRound];
+      const count = state.selected.length;
+
+      document.getElementById('g1-current-count').textContent = count;
+      document.getElementById('g1-history-badge-count').textContent = count;
+      document.getElementById('g1-progress-bar').style.width = `${(count / G1_MAX) * 100}%`;
+
+      const overlay = document.getElementById('g1-lock-overlay');
+      const startBox = document.getElementById('g1-overlay-start-content');
+      const finishBox = document.getElementById('g1-overlay-finish-content');
+      const badge = document.getElementById('g1-status-badge');
+
+      if (!state.isActive && count === 0) {
+        overlay.classList.remove('hidden');
+        startBox.classList.remove('hidden');
+        finishBox.classList.add('hidden');
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span><span>대기 중</span>';
+        badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1';
+      } else if (count === G1_MAX) {
+        overlay.classList.remove('hidden');
+        startBox.classList.add('hidden');
+        finishBox.classList.remove('hidden');
+        badge.innerHTML = '<span>🎄</span><span>제출 완료</span>';
+        badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1';
+      } else {
+        overlay.classList.add('hidden');
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span><span>진행 중</span>';
+        badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1';
+      }
+
+      const lastBadge = document.getElementById('g1-last-selection-badge');
+      if (count > 0) {
+        const last = state.selected[count - 1];
+        lastBadge.textContent = `#${count} ${last.name}`;
+        lastBadge.className = `px-2 py-0.5 rounded-full font-bold ${last.text} text-[10px] shadow-sm`;
+        lastBadge.style.backgroundColor = last.hex;
+      } else {
+        lastBadge.textContent = '없음';
+        lastBadge.className = 'px-2 py-0.5 rounded-full font-bold bg-white/10 text-white/50 text-[10px]';
+        lastBadge.style.backgroundColor = 'transparent';
+      }
+    }
+
+    function toggleG1HistoryModal() {
+      const modal = document.getElementById('g1-history-modal');
+      const listEl = document.getElementById('g1-history-list');
+      const scoreBadge = document.getElementById('g1-score-badge');
+      document.getElementById('g1-modal-round-tag').textContent = `R${currentRound}`;
+
+      const state = g1Data[currentRound];
+      const targetAns = currentRound === 1 ? HARDCODED_ANSWERS.g1.r1 : HARDCODED_ANSWERS.g1.r2;
+
+      if (state.selected.length === 0) {
+        listEl.innerHTML = `<div class="py-10 text-center text-slate-400"><span>아직 입력된 색상이 없습니다.</span></div>`;
+        scoreBadge.textContent = `0 / 15 점`;
+      } else {
+        let correctCount = 0;
+        listEl.innerHTML = targetAns.map((correctColor, idx) => {
+          const userChoice = state.selected[idx];
+          if (!userChoice) {
+            return `
+              <div class="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 opacity-50">
+                <span class="w-5 text-slate-400 font-bold">#${String(idx + 1).padStart(2, '0')}</span>
+                <span class="text-slate-400">미입력</span>
+                <span class="text-slate-500">정답: ${correctColor}</span>
+              </div>
+            `;
+          }
+          const isCorrect = userChoice.name === correctColor;
+          if (isCorrect) correctCount++;
+          return `
+            <div class="flex items-center justify-between p-2 rounded-xl ${isCorrect ? 'bg-emerald-950/40 border border-emerald-500/30' : 'bg-rose-950/40 border border-rose-500/30'}">
+              <div class="flex items-center gap-2">
+                <span class="w-5 font-bold text-slate-300">#${String(idx + 1).padStart(2, '0')}</span>
+                <span class="w-2.5 h-2.5 rounded-full" style="background-color:${userChoice.hex}"></span>
+                <span class="font-bold ${isCorrect ? 'text-emerald-300' : 'text-rose-300'}">${userChoice.name}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                ${!isCorrect ? `<span class="text-[10px] text-slate-400">정답: ${correctColor}</span>` : ''}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-black ${isCorrect ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+                  ${isCorrect ? 'O' : 'X'}
+                </span>
+              </div>
+            </div>
+          `;
+        }).join('');
+        scoreBadge.textContent = `${correctCount} / 15 점`;
+      }
+
+      modal.classList.toggle('hidden');
+      modal.classList.toggle('flex');
+    }
+
+    function openG1ResetModal() {
+      document.getElementById('g1-reset-modal').classList.remove('hidden');
+      document.getElementById('g1-reset-modal').classList.add('flex');
+    }
+    function closeG1ResetModal() {
+      document.getElementById('g1-reset-modal').classList.add('hidden');
+      document.getElementById('g1-reset-modal').classList.remove('flex');
+    }
+    function confirmG1Reset() {
+      g1Data[currentRound].selected = [];
+      g1Data[currentRound].isActive = false;
+      closeG1ResetModal();
+      updateG1UI();
+    }
+
+    // =============================================================
+    // 4. GAME 2 : 키패드 순서 기억
+    // =============================================================
+    const G2_RULES = [
+      { stage: 1, limit: 3, label: 'St 1', key: 'st1' },
+      { stage: 2, limit: 7, label: 'St 2', key: 'st2' },
+      { stage: 3, limit: 12, label: 'St 3', key: 'st3' }
+    ];
+
+    // 라운드별 독립 저장
+    const g2Data = {
+      1: { currentStageIndex: 0, inputs: [[], [], []] },
+      2: { currentStageIndex: 0, inputs: [[], [], []] }
+    };
+
+    function renderG2Keypad() {
+      const grid = document.getElementById('g2-keypad-grid');
+      grid.innerHTML = '';
+      for (let i = 1; i <= 9; i++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `num-btn relative w-full h-full rounded-2xl bg-gradient-to-b from-[#243f30] to-[#14261d] border-b-[#0b1711] text-amber-300 font-mono text-3xl font-black flex items-center justify-center active:bg-emerald-900/60 shadow-lg`;
+        btn.textContent = i;
+        btn.addEventListener('click', () => recordG2Number(i));
+        grid.appendChild(btn);
+      }
+    }
+
+    function recordG2Number(num) {
+      const state = g2Data[currentRound];
+      const rule = G2_RULES[state.currentStageIndex];
+      const currList = state.inputs[state.currentStageIndex];
+
+      if (currList.length >= rule.limit) return;
+      if (navigator.vibrate) navigator.vibrate(12);
+
+      currList.push(num);
+      updateG2UI();
+
+      if (currList.length === rule.limit) {
+        handleG2StageCompletion();
+      }
+    }
+
+    function handleG2StageCompletion() {
+      const state = g2Data[currentRound];
+      const rule = G2_RULES[state.currentStageIndex];
+      const overlay = document.getElementById('g2-stage-lock-overlay');
+      const nextBox = document.getElementById('g2-overlay-next-stage');
+      const finishBox = document.getElementById('g2-overlay-final-finish');
+
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      if (state.currentStageIndex < G2_RULES.length - 1) {
+        nextBox.classList.remove('hidden');
+        nextBox.classList.add('flex');
+        finishBox.classList.add('hidden');
+        document.getElementById('g2-stage-clear-title').textContent = `${rule.label} 입력 완료!`;
+      } else {
+        nextBox.classList.add('hidden');
+        finishBox.classList.remove('hidden');
+        finishBox.classList.add('flex');
+      }
+    }
+
+    function advanceG2NextStage() {
+      const state = g2Data[currentRound];
+      if (state.currentStageIndex < G2_RULES.length - 1) {
+        state.currentStageIndex++;
+        document.getElementById('g2-stage-lock-overlay').classList.add('hidden');
+        document.getElementById('g2-stage-lock-overlay').classList.remove('flex');
+        document.getElementById('g2-overlay-next-stage').classList.add('hidden');
+        updateG2UI();
+      }
+    }
+
+    function updateG2UI() {
+      const state = g2Data[currentRound];
+      const rule = G2_RULES[state.currentStageIndex];
+      const currList = state.inputs[state.currentStageIndex];
+
+      document.getElementById('g2-stage-badge').textContent = rule.label;
+      document.getElementById('g2-input-count').textContent = currList.length;
+      document.getElementById('g2-max-count').textContent = `/ ${rule.limit}`;
+
+      const statusEl = document.getElementById('g2-stage-status-text');
+      if (currList.length === rule.limit) {
+        statusEl.textContent = '입력 마감';
+        statusEl.className = 'text-xs font-semibold text-emerald-400';
+      } else {
+        statusEl.textContent = '순서 입력 진행 중';
+        statusEl.className = 'text-xs font-semibold text-slate-300';
+      }
+
+      // 슬롯 렌더링
+      const slots = document.getElementById('g2-slots-container');
+      slots.innerHTML = '';
+      for (let i = 0; i < rule.limit; i++) {
+        const slot = document.createElement('div');
+        if (i < currList.length) {
+          slot.className = 'min-w-[26px] h-7 rounded-lg bg-amber-400/20 border border-amber-400/50 text-amber-300 font-mono font-black text-xs flex items-center justify-center shadow-inner';
+          slot.textContent = currList[i];
+        } else {
+          slot.className = 'min-w-[26px] h-7 rounded-lg bg-white/5 border border-white/10 text-white/20 font-mono text-[11px] flex items-center justify-center';
+          slot.textContent = i + 1;
+        }
+        slots.appendChild(slot);
+      }
+    }
+
+    function openG2VerificationModal() {
+      document.getElementById('g2-modal-round-tag').textContent = `R${currentRound}`;
+      const state = g2Data[currentRound];
+      const targetRoundAnswers = currentRound === 1 ? HARDCODED_ANSWERS.g2.r1 : HARDCODED_ANSWERS.g2.r2;
+
+      let totalScore = 0;
+
+      // 3개 스테이지 채점
+      G2_RULES.forEach((rule, idx) => {
+        const userList = state.inputs[idx];
+        const targetList = targetRoundAnswers[rule.key];
+
+        // 자릿수별 일치 검사
+        let matchCount = 0;
+        for (let j = 0; j < Math.min(userList.length, targetList.length); j++) {
+          if (userList[j] === targetList[j]) matchCount++;
+        }
+        totalScore += matchCount;
+
+        const ansEl = document.getElementById(`g2-modal-ans-${rule.key}`);
+        const targetEl = document.getElementById(`g2-modal-target-${rule.key}`);
+        const scoreEl = document.getElementById(`g2-modal-${rule.key}-score`);
+
+        ansEl.textContent = userList.length > 0 ? userList.join(' - ') : '(미입력)';
+        targetEl.textContent = targetList.join(' - ');
+        scoreEl.textContent = `${matchCount} / ${rule.limit} 일치`;
+      });
+
+      document.getElementById('g2-score-badge').textContent = `${totalScore} / 22 점`;
+
+      const modal = document.getElementById('g2-verify-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeG2VerificationModal() {
+      const modal = document.getElementById('g2-verify-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function openG2ResetModal() {
+      document.getElementById('g2-reset-modal').classList.remove('hidden');
+      document.getElementById('g2-reset-modal').classList.add('flex');
+    }
+    function closeG2ResetModal() {
+      document.getElementById('g2-reset-modal').classList.add('hidden');
+      document.getElementById('g2-reset-modal').classList.remove('flex');
+    }
+    function confirmG2Reset() {
+      g2Data[currentRound].inputs = [[], [], []];
+      g2Data[currentRound].currentStageIndex = 0;
+      document.getElementById('g2-stage-lock-overlay').classList.add('hidden');
+      document.getElementById('g2-stage-lock-overlay').classList.remove('flex');
+      document.getElementById('g2-overlay-next-stage').classList.add('hidden');
+      document.getElementById('g2-overlay-final-finish').classList.add('hidden');
+      closeG2ResetModal();
+      updateG2UI();
+    }
+
+    // =============================================================
+    // 5. 배경 눈꽃 효과
+    // =============================================================
+    function createSnowflakes() {
+      const snowContainer = document.getElementById('snow-layer');
+      const count = 22;
+      for (let i = 0; i < count; i++) {
+        const snowflake = document.createElement('div');
+        snowflake.classList.add('snowflake');
+        const size = Math.random() * 2.5 + 1.5;
+        snowflake.style.width = `${size}px`;
+        snowflake.style.height = `${size}px`;
+        snowflake.style.left = `${Math.random() * 100}vw`;
+        snowflake.style.animationDuration = `${Math.random() * 6 + 6}s`;
+        snowflake.style.animationDelay = `${Math.random() * 5}s`;
+        snowContainer.appendChild(snowflake);
+      }
+    }
+
+    window.onload = function() {
+      createSnowflakes();
+      renderG1Keypad();
+      renderG2Keypad();
+      syncHeaders();
+      updateG1UI();
+      updateG2UI();
+    };
+  </script>
+</body>
+</html>
