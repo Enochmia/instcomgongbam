@@ -79,8 +79,19 @@
 </head>
 <body class="flex flex-col justify-between h-screen p-5 lg:p-7 max-w-5xl mx-auto">
 
-  <!-- ================= 상단 단일 바 (오직 게임명 / St# 만 표시) ================= -->
-  <header class="w-full flex items-center justify-center border-b border-white/10 pb-4">
+  <!-- ================= 상단 바 (라운드 토글 & 단일 타이틀) ================= -->
+  <header class="w-full flex flex-col items-center justify-center border-b border-white/10 pb-4 gap-3">
+    <!-- 라운드 선택 버튼 (G1/G2 플레이어 앱 규격 일치) -->
+    <div class="flex items-center gap-2 p-1 bg-black/40 rounded-xl border border-white/10">
+      <button onclick="switchRound(1)" id="btn-round-1" class="px-5 py-1.5 rounded-lg text-xs font-black transition-all bg-emerald-500 text-slate-950 shadow-md">
+        ROUND 1
+      </button>
+      <button onclick="switchRound(2)" id="btn-round-2" class="px-5 py-1.5 rounded-lg text-xs font-black transition-all bg-transparent text-slate-400 hover:text-white">
+        ROUND 2
+      </button>
+    </div>
+
+    <!-- 타이틀 배지 -->
     <div class="flex items-center gap-3">
       <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
       <h1 id="header-title-badge" class="text-2xl sm:text-3xl font-black tracking-wide font-mono text-amber-400">
@@ -120,15 +131,15 @@
 
   </main>
 
-  <!-- ================= 하단 진행자 컨트롤 바 (이전 버튼 삭제, 깔끔한 동선) ================= -->
+  <!-- ================= 하단 진행자 컨트롤 바 ================= -->
   <footer class="w-full bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 p-3 lg:p-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       
-      <!-- 좌측: 새 시퀀스 랜덤 생성 -->
-      <button onclick="regenerateCurrentStageSequence()" id="btn-re-random" class="host-btn px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 font-bold text-xs flex items-center gap-1.5">
-        <i class="fa-solid fa-shuffle"></i>
-        <span>새 시퀀스 생성</span>
-      </button>
+      <!-- 좌측: 스테이지 현황 배지 -->
+      <div class="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-mono font-bold text-xs flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        <span id="stage-meta-text">St 1 (3자)</span>
+      </div>
 
       <!-- 중앙 핵심: 시퀀스 시작 -->
       <button id="btn-play" onclick="startFocusAndPlay()" class="host-btn px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm sm:text-base shadow-lg shadow-emerald-950/70 flex items-center gap-2 border-t border-emerald-300/40">
@@ -161,7 +172,7 @@
       <div class="flex items-center justify-between border-b border-white/10 pb-3">
         <h3 class="text-base font-black text-white flex items-center gap-2">
           <span class="text-amber-400">📋</span>
-          <span>스테이지별 정답</span>
+          <span id="modal-round-title">ROUND 1 정답표</span>
         </h3>
         <button onclick="closeAnswerModal()" class="text-slate-400 hover:text-white text-xl p-1 leading-none">✕</button>
       </div>
@@ -169,15 +180,15 @@
       <!-- st1, st2, st3 답안 리스트 -->
       <div class="space-y-3 font-mono text-sm">
         <div class="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
-          <span class="text-xs font-bold text-emerald-400">st1</span>
+          <span class="text-xs font-bold text-emerald-400">st1 (3자리)</span>
           <span id="ans-st1" class="text-white font-bold tracking-wider text-base"></span>
         </div>
         <div class="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
-          <span class="text-xs font-bold text-amber-400">st2</span>
+          <span class="text-xs font-bold text-amber-400">st2 (7자리)</span>
           <span id="ans-st2" class="text-white font-bold tracking-wider text-base"></span>
         </div>
         <div class="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
-          <span class="text-xs font-bold text-rose-400">st3</span>
+          <span class="text-xs font-bold text-rose-400">st3 (12자리)</span>
           <span id="ans-st3" class="text-white font-bold tracking-wider text-base"></span>
         </div>
       </div>
@@ -193,7 +204,7 @@
 
   <!-- ================= 로직 스크립트 ================= -->
   <script>
-    // 오디오 톤 비프음 (초고속 플래시 사운드 피드백)
+    // 오디오 비프음 피드백
     let audioCtx = null;
     function playBeep(freq = 660, duration = 0.12, type = 'sine') {
       try {
@@ -218,70 +229,84 @@
       }
     }
 
-    // ================= 단일 라운드 3단계 설정 =================
+    // ================= 플레이어 앱과 100% 일치하는 하드코딩 정답 데이터 =================
+    const HARDCODED_ANSWERS = {
+      1: [
+        [4, 8, 2],
+        [7, 1, 9, 3, 5, 8, 4],
+        [6, 2, 9, 1, 5, 7, 3, 8, 4, 2, 9, 5]
+      ],
+      2: [
+        [3, 7, 1],
+        [5, 9, 2, 6, 4, 1, 8],
+        [8, 4, 1, 7, 3, 9, 2, 6, 5, 8, 1, 4]
+      ]
+    };
+
     const STAGE_CONFIGS = [
       { stage: 1, length: 3, lightTime: 270, intervalTime: 120 },
       { stage: 2, length: 7, lightTime: 220, intervalTime: 100 },
       { stage: 3, length: 12, lightTime: 170, intervalTime: 85 }
     ];
 
+    let currentRound = 1;
     let currentStageIndex = 0;
-    // 세 스테이지 시퀀스를 미리 보관
-    let stageSequences = [[], [], []];
     let isPlaying = false;
 
     // DOM 캐싱
     const headerTitleBadge = document.getElementById('header-title-badge');
+    const stageMetaText = document.getElementById('stage-meta-text');
     const focusDimOverlay = document.getElementById('focus-dim-overlay');
     const btnPlay = document.getElementById('btn-play');
     const btnReveal = document.getElementById('btn-reveal');
     const btnNextStage = document.getElementById('btn-next-stage');
     const nextStageText = document.getElementById('next-stage-text');
-    const btnReRandom = document.getElementById('btn-re-random');
+    const btnRound1 = document.getElementById('btn-round-1');
+    const btnRound2 = document.getElementById('btn-round-2');
 
     const answerModal = document.getElementById('answer-modal');
+    const modalRoundTitle = document.getElementById('modal-round-title');
     const ansSt1 = document.getElementById('ans-st1');
     const ansSt2 = document.getElementById('ans-st2');
     const ansSt3 = document.getElementById('ans-st3');
 
-    // ================= 랜덤 시퀀스 생성 (1 ~ 9, 연속 중복 방지) =================
-    function generateSequence(len) {
-      const seq = [];
-      for (let i = 0; i < len; i++) {
-        let num;
-        do {
-          num = Math.floor(Math.random() * 9) + 1;
-        } while (i > 0 && num === seq[i - 1]);
-        seq.push(num);
-      }
-      return seq;
-    }
+    // 라운드 전환 (1 <-> 2)
+    function switchRound(round) {
+      if (isPlaying) return;
+      currentRound = round;
+      currentStageIndex = 0;
 
-    // 전체 스테이지 시퀀스 초기화 생성
-    function initAllSequences() {
-      STAGE_CONFIGS.forEach((cfg, idx) => {
-        stageSequences[idx] = generateSequence(cfg.length);
-      });
+      if (round === 1) {
+        btnRound1.className = 'px-5 py-1.5 rounded-lg text-xs font-black transition-all bg-emerald-500 text-slate-950 shadow-md';
+        btnRound2.className = 'px-5 py-1.5 rounded-lg text-xs font-black transition-all bg-transparent text-slate-400 hover:text-white';
+      } else {
+        btnRound1.className = 'px-5 py-1.5 rounded-lg text-xs font-black transition-all bg-transparent text-slate-400 hover:text-white';
+        btnRound2.className = 'px-5 py-1.5 rounded-lg text-xs font-black transition-all bg-emerald-500 text-slate-950 shadow-md';
+      }
+
+      loadStage(0);
       updateAnswerModalContent();
     }
 
-    // 정답 모달 텍스트 갱신 (st1: 1 - 4 - 5 형식)
+    // 정답 모달 갱신
     function updateAnswerModalContent() {
-      ansSt1.textContent = stageSequences[0].join(' - ');
-      ansSt2.textContent = stageSequences[1].join(' - ');
-      ansSt3.textContent = stageSequences[2].join(' - ');
+      const answers = HARDCODED_ANSWERS[currentRound];
+      modalRoundTitle.textContent = `ROUND ${currentRound} 정답표`;
+      ansSt1.textContent = answers[0].join(' - ');
+      ansSt2.textContent = answers[1].join(' - ');
+      ansSt3.textContent = answers[2].join(' - ');
     }
 
-    // 현재 스테이지 로드
+    // 스테이지 로드
     function loadStage(index) {
       if (isPlaying) return;
       currentStageIndex = index;
       const stageNum = STAGE_CONFIGS[currentStageIndex].stage;
+      const len = STAGE_CONFIGS[currentStageIndex].length;
 
-      // 상단 바: 에이징 테스트 G2 / St1
       headerTitleBadge.textContent = `에이징 테스트 G2 / St${stageNum}`;
+      stageMetaText.textContent = `St ${stageNum} (${len}자)`;
 
-      // 마지막 스테이지일 때 다음 버튼 텍스트 변경
       if (currentStageIndex === STAGE_CONFIGS.length - 1) {
         nextStageText.textContent = '처음으로';
       } else {
@@ -289,18 +314,11 @@
       }
     }
 
-    // 다음 스테이지 진행 (St3에서 누르면 St1로 순환)
+    // 다음 스테이지
     function nextStage() {
       if (isPlaying) return;
       const nextIndex = (currentStageIndex + 1) % STAGE_CONFIGS.length;
       loadStage(nextIndex);
-    }
-
-    // 현재 스테이지 새 시퀀스 재생성
-    function regenerateCurrentStageSequence() {
-      if (isPlaying) return;
-      stageSequences[currentStageIndex] = generateSequence(STAGE_CONFIGS[currentStageIndex].length);
-      updateAnswerModalContent();
     }
 
     function setControlsDisabled(disabled) {
@@ -308,22 +326,22 @@
       btnPlay.disabled = disabled;
       btnReveal.disabled = disabled;
       btnNextStage.disabled = disabled;
-      btnReRandom.disabled = disabled;
+      btnRound1.disabled = disabled;
+      btnRound2.disabled = disabled;
     }
 
-    // ================= 재생 로직 (1초 블러 후 초고속 번호 발광) =================
+    // ================= 재생 로직 (1초 딤 후 고속 플래시) =================
     async function startFocusAndPlay() {
       if (isPlaying) return;
       setControlsDisabled(true);
 
-      // 1초간 흐려지는 포커스 효과
+      // 1초간 화면을 살짝 흐리는 집중 효과
       focusDimOverlay.classList.remove('opacity-0');
       focusDimOverlay.classList.add('opacity-100');
       playBeep(440, 0.1, 'sine');
 
       await new Promise(r => setTimeout(r, 1000));
 
-      // 흐려짐 해제 후 바로 번호 점등
       focusDimOverlay.classList.remove('opacity-100');
       focusDimOverlay.classList.add('opacity-0');
       await new Promise(r => setTimeout(r, 90));
@@ -331,10 +349,10 @@
       await playSequenceAnimation();
     }
 
-    // 숫자별 고속 플래시 루프
+    // 고정된 시퀀스 플래시 루프
     async function playSequenceAnimation() {
       const cfg = STAGE_CONFIGS[currentStageIndex];
-      const sequence = stageSequences[currentStageIndex];
+      const sequence = HARDCODED_ANSWERS[currentRound][currentStageIndex];
 
       for (let i = 0; i < sequence.length; i++) {
         const num = sequence[i];
@@ -357,7 +375,7 @@
       playBeep(784, 0.35, 'triangle');
     }
 
-    // ================= 정답 확인 팝업 모달 열기/닫기 =================
+    // 모달 제어
     function openAnswerModal() {
       updateAnswerModalContent();
       answerModal.classList.remove('hidden');
@@ -369,10 +387,9 @@
       answerModal.classList.remove('flex');
     }
 
-    // 초기화
+    // 초기 실행
     window.onload = function() {
-      initAllSequences();
-      loadStage(0);
+      switchRound(1);
     };
   </script>
 </body>
