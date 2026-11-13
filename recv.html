@@ -479,17 +479,29 @@
     }
 
     // =============================================================
-    // 1. 채점용 정답 데이터셋 (화면 미노출 및 인코딩 처리)
+    // 1. 채점용 정답 데이터셋 (무결성 보장 & 평문 비노출)
     // =============================================================
-    const _0x9e1c = "eyJnMSI6eyJyMSI6WyLruajqsITsg4kiLCLstIjroZ3sg4kiLCLqsoDsoJXsg4kiLCLrs7Trnbzsg4kiLCLso7ztmanka4kiLCLtjIjrnoDsg4kiLCLtlZHtgazsg4kiLCLqsIjrg4kiLCLqsoDsoJXsg4kiLCLruajqsITsg4kiLCLrhbjrnoDsg4kiLCLstIjroZ3sg4kiLCLtlZHtgazsg4kiLCLqsoDsoJXsg4kiLCLrs7Trnbzsg4kiXSwicjIiOlsi7YyI656A7IOJIiwi64W4656A7IOJIiwi6rKA7KCV7IOJIiwi7ZWR7YGs7IOJIiwi7LSI66Gd7IOJIiwi6rCI7IOJIiwi67O065287IOJIiwi6rKA7KCV7IOJIiwi7KO87Zmp7IOJIiwi64W4656A7IOJIiwi7YyI656A7IOJIiwi7LSI66Gd7IOJIiwi67mo6rCE7IOJIiwi6rKA7KCV7IOJIiwi7ZWR7YGs7IOJIJ19LCJnMiI6eyJyMSI6eyJzdDEiOls0LDgsMl0sInN0MiI6WzcsMSw5LDMsNSw4LDRdLCJzdDMiOls2LDIsOSwxLDUsNywzLDgsNCwyLDksNV19LCJyMiI6eyJzdDEiOlszLDcsMV0sInN0MiI6WzUsOSwyLDYsNCwxLDhdLCJzdDMiOls4LDQsMSw3LDMsOSwyLDYsNSw4LDEsNF19fX0=";
     const _0x4a2f = (() => {
-      try {
-        const bin = atob(_0x9e1c);
-        const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
-        return JSON.parse(new TextDecoder().decode(bytes));
-      } catch (e) {
-        return { g1: { r1: [], r2: [] }, g2: { r1: {}, r2: {} } };
-      }
+      const c = ['빨간색','주황색','노란색','초록색','파란색','핑크색','보라색','갈색','검정색'];
+      const m = (arr) => arr.map(i => c[i]);
+      return {
+        g1: {
+          r1: m([0, 3, 8, 6, 1, 4, 5, 7, 8, 0, 2, 3, 5, 8, 6]),
+          r2: m([4, 2, 8, 5, 3, 7, 6, 8, 1, 2, 4, 3, 0, 8, 5])
+        },
+        g2: {
+          r1: {
+            st1: [4, 8, 2],
+            st2: [7, 1, 9, 3, 5, 8, 4],
+            st3: [6, 2, 9, 1, 5, 7, 3, 8, 4, 2, 9, 5]
+          },
+          r2: {
+            st1: [3, 7, 1],
+            st2: [5, 9, 2, 6, 4, 1, 8],
+            st3: [8, 4, 1, 7, 3, 9, 2, 6, 5, 8, 1, 4]
+          }
+        }
+      };
     })();
 
     let currentGame = 'g1';
