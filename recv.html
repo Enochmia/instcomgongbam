@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- 삼성 인터넷, 오페라, 크롬 등의 강제 다크 모드(Force Dark Mode) 색상 반전 원천 차단 -->
+  <meta name="color-scheme" content="only light" />
+  <meta name="supported-color-schemes" content="light" />
   <title>에이징 테스트 - 플레이어 기록기</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -10,6 +13,7 @@
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
@@ -21,45 +25,58 @@
     };
   </script>
   <style>
+    :root {
+      color-scheme: only light;
+      forced-color-adjust: none;
+      -webkit-forced-color-adjust: none;
+    }
+
     * {
       font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
       -webkit-user-select: none;
       touch-action: manipulation;
+      forced-color-adjust: none;
+      -webkit-forced-color-adjust: none;
     }
-    body {
-      background: radial-gradient(circle at 50% 12%, #193d28 0%, #0d2317 55%, #05130b 100%);
+
+    html, body {
+      color-scheme: only light;
+      background-color: #05130b !important;
+      background-image: radial-gradient(circle at 50% 12%, #193d28 0%, #0d2317 55%, #05130b 100%) !important;
       min-height: 100vh;
-      color: #f8fafc;
-      touch-action: manipulation;
+      color: #f8fafc !important;
+      overscroll-behavior: none;
     }
 
     /* G1 햅틱 입체 키패드 스타일 */
     .keypad-btn {
       touch-action: manipulation;
-      transition: transform 0.05s ease-out, border-bottom-width 0.05s ease-out, filter 0.05s ease-out;
+      will-change: transform;
+      transition: transform 0.04s ease-out, filter 0.04s ease-out;
       border-top: 1px solid rgba(255, 255, 255, 0.42);
       border-bottom-width: 4px;
       box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
     }
-    .keypad-btn:active {
-      transform: translateY(3px);
+    .keypad-btn:active, .keypad-btn.is-pressed {
+      transform: translateY(3px) scale(0.98);
       border-bottom-width: 1px;
-      filter: brightness(0.97);
+      filter: brightness(0.95);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 
     /* G2 햅틱 입체 키패드 스타일 */
     .num-btn {
       touch-action: manipulation;
-      transition: transform 0.05s ease-out, filter 0.05s ease-out, border-bottom-width 0.05s ease-out;
+      will-change: transform;
+      transition: transform 0.04s ease-out, filter 0.04s ease-out;
       border-top: 1px solid rgba(255, 255, 255, 0.25);
       border-bottom-width: 4px;
       box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.5);
     }
-    .num-btn:active:not(:disabled) {
-      transform: translateY(3px);
+    .num-btn:active:not(:disabled), .num-btn.is-pressed:not(:disabled) {
+      transform: translateY(3px) scale(0.98);
       border-bottom-width: 1px;
       filter: brightness(0.92);
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
@@ -73,17 +90,20 @@
     /* 은은한 배경 눈꽃 효과 */
     .snowflake {
       position: absolute;
-      background: white;
+      top: 0;
+      left: 0;
+      background: #ffffff;
       border-radius: 50%;
       pointer-events: none;
       opacity: 0.22;
+      will-change: transform, opacity;
       animation: snowfall linear infinite;
     }
     @keyframes snowfall {
-      0% { transform: translateY(-8px) translateX(0); opacity: 0; }
+      0% { transform: translate3d(0, -8px, 0); opacity: 0; }
       15% { opacity: 0.3; }
       85% { opacity: 0.25; }
-      100% { transform: translateY(105vh) translateX(18px); opacity: 0; }
+      100% { transform: translate3d(18px, 105vh, 0); opacity: 0; }
     }
 
     ::-webkit-scrollbar {
@@ -129,7 +149,7 @@
   </nav>
 
   <!-- ============================================================== -->
-  <!--                      GAME 1 : 색깔 단어 게임                    -->
+  <!-- GAME 1 : 색깔 단어 게임 -->
   <!-- ============================================================== -->
   <section id="view-g1" class="w-full flex-1 flex flex-col justify-between z-10">
     <header class="w-full flex flex-col items-center pt-1 pb-1.5 text-center">
@@ -164,7 +184,7 @@
         </div>
 
         <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden p-0.5 border border-white/5">
-          <div id="g1-progress-bar" class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-150 rounded-full w-0"></div>
+          <div id="g1-progress-bar" class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-100 rounded-full w-0"></div>
         </div>
       </div>
 
@@ -194,7 +214,7 @@
               모든 단어 색상 입력이 마감되었습니다.<br />하단의 검수 버튼을 눌러 점수를 확인하세요.
             </p>
             <button onclick="toggleG1HistoryModal()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-sm shadow-lg active:scale-95 transition-all">
-              📋 정답 및 채점 확인
+              📋 입력 내역 및 점수 확인
             </button>
           </div>
         </div>
@@ -227,7 +247,7 @@
   </section>
 
   <!-- ============================================================== -->
-  <!--                   GAME 2 : 키패드 순서 기억                     -->
+  <!-- GAME 2 : 키패드 순서 기억 -->
   <!-- ============================================================== -->
   <section id="view-g2" class="w-full flex-1 flex flex-col justify-between z-10 hidden">
     <header class="w-full flex flex-col items-center pt-1 pb-1 text-center">
@@ -283,10 +303,10 @@
             </div>
             <h2 class="text-xl font-extrabold text-white mb-1">모든 스테이지 완료!</h2>
             <p class="text-xs text-slate-300 mb-4 leading-relaxed">
-              St 1, St 2, St 3 입력이 모두 끝났습니다.<br />스태프에게 검수표를 보여주세요.
+              St 1, St 2, St 3 입력이 모두 끝났습니다.<br />스태프에게 결과표를 보여주세요.
             </p>
             <button onclick="openG2VerificationModal()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-sm shadow-lg active:scale-95 transition-all">
-              📋 답안 검수표 열기
+              📋 결과 및 점수표 열기
             </button>
           </div>
         </div>
@@ -303,7 +323,7 @@
       <div class="w-full flex items-center justify-between gap-2.5">
         <button onclick="openG2VerificationModal()" class="flex-1 py-2.5 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-bold text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
           <span>📋</span>
-          <span>답안 검수 및 채점</span>
+          <span>입력 내역 및 채점</span>
         </button>
 
         <button onclick="openG2ResetModal()" class="py-2.5 px-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
@@ -314,13 +334,13 @@
     </footer>
   </section>
 
-  <!-- ================= G1 검수 & 자동 채점 모달 ================= -->
+  <!-- ================= G1 검수 & 자동 채점 모달 (정답 비노출) ================= -->
   <div id="g1-history-modal" class="fixed inset-0 z-40 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-sm max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
       <div class="p-3.5 border-b border-white/10 flex items-center justify-between bg-white/5">
         <div class="flex items-center gap-2">
           <span class="text-amber-400">📋</span>
-          <h3 class="text-sm font-bold text-white">G1 검수표 (<span id="g1-modal-round-tag" class="font-mono text-amber-300">R1</span>)</h3>
+          <h3 class="text-sm font-bold text-white">G1 결과표 (<span id="g1-modal-round-tag" class="font-mono text-amber-300">R1</span>)</h3>
         </div>
         <div id="g1-score-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold text-xs">
           0 / 15 점
@@ -351,13 +371,13 @@
     </div>
   </div>
 
-  <!-- ================= G2 검수 & 자동 채점 모달 ================= -->
+  <!-- ================= G2 검수 & 자동 채점 모달 (정답 비노출) ================= -->
   <div id="g2-verify-modal" class="fixed inset-0 z-40 bg-black/85 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="bg-slate-900 border border-white/20 rounded-3xl w-full max-w-sm flex flex-col shadow-2xl overflow-hidden max-h-[85vh]">
       <div class="p-3.5 border-b border-white/10 flex items-center justify-between bg-white/5">
         <div class="flex items-center gap-2">
           <span class="text-amber-400">📋</span>
-          <h3 class="text-sm font-bold text-white">G2 검수표 (<span id="g2-modal-round-tag" class="font-mono text-amber-300">R1</span>)</h3>
+          <h3 class="text-sm font-bold text-white">G2 결과표 (<span id="g2-modal-round-tag" class="font-mono text-amber-300">R1</span>)</h3>
         </div>
         <div id="g2-score-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold text-xs">
           0 / 22 점
@@ -372,7 +392,6 @@
             <span id="g2-modal-st1-score" class="text-[11px] font-bold text-amber-300">0 / 3 일치</span>
           </div>
           <div class="text-[11px] text-slate-400">내 답안: <span id="g2-modal-ans-st1" class="text-white font-bold tracking-wider">(미입력)</span></div>
-          <div class="text-[11px] text-slate-400">정&nbsp;&nbsp;&nbsp;답: <span id="g2-modal-target-st1" class="text-emerald-400 font-bold tracking-wider"></span></div>
         </div>
 
         <!-- St2 -->
@@ -382,7 +401,6 @@
             <span id="g2-modal-st2-score" class="text-[11px] font-bold text-amber-300">0 / 7 일치</span>
           </div>
           <div class="text-[11px] text-slate-400">내 답안: <span id="g2-modal-ans-st2" class="text-white font-bold tracking-wider">(미입력)</span></div>
-          <div class="text-[11px] text-slate-400">정&nbsp;&nbsp;&nbsp;답: <span id="g2-modal-target-st2" class="text-amber-400 font-bold tracking-wider"></span></div>
         </div>
 
         <!-- St3 -->
@@ -392,7 +410,6 @@
             <span id="g2-modal-st3-score" class="text-[11px] font-bold text-amber-300">0 / 12 일치</span>
           </div>
           <div class="text-[11px] text-slate-400">내 답안: <span id="g2-modal-ans-st3" class="text-white font-bold tracking-wider">(미입력)</span></div>
-          <div class="text-[11px] text-slate-400">정&nbsp;&nbsp;&nbsp;답: <span id="g2-modal-target-st3" class="text-rose-400 font-bold tracking-wider"></span></div>
         </div>
       </div>
       <div class="p-3 border-t border-white/10 bg-white/5">
@@ -420,47 +437,61 @@
 
   <script>
     // =============================================================
-    // 0. 더블 탭 확대 완전 방어
+    // 0. 강제 다크 모드(Force Dark Mode) 런타임 방어 & CPS 제한 해제
     // =============================================================
-    document.addEventListener('dblclick', function(e) { e.preventDefault(); }, { passive: false });
-    let lastTouchTime = 0;
-    document.addEventListener('touchend', function(e) {
-      const now = Date.now();
-      if (now - lastTouchTime <= 300) { e.preventDefault(); }
-      lastTouchTime = now;
-    }, { passive: false });
-
-    // =============================================================
-    // 1. 하드코딩된 정답 데이터셋 (PDF 분석 결과 & G2 생성 정답)
-    // =============================================================
-    const HARDCODED_ANSWERS = {
-      g1: {
-        r1: [
-          '빨간색', '초록색', '검정색', '보라색', '주황색',
-          '파란색', '핑크색', '갈색', '검정색', '빨간색',
-          '노란색', '초록색', '핑크색', '검정색', '보라색'
-        ],
-        r2: [
-          '파란색', '노란색', '검정색', '핑크색', '초록색',
-          '갈색', '보라색', '검정색', '주황색', '노란색',
-          '파란색', '초록색', '빨간색', '검정색', '핑크색'
-        ]
-      },
-      g2: {
-        r1: {
-          st1: [4, 8, 2],
-          st2: [7, 1, 9, 3, 5, 8, 4],
-          st3: [6, 2, 9, 1, 5, 7, 3, 8, 4, 2, 9, 5]
-        },
-        r2: {
-          st1: [3, 7, 1],
-          st2: [5, 9, 2, 6, 4, 1, 8],
-          st3: [8, 4, 1, 7, 3, 9, 2, 6, 5, 8, 1, 4]
-        }
+    (function enforceOriginalColorsAndUnlockCPS() {
+      document.documentElement.style.setProperty('color-scheme', 'only light', 'important');
+      document.documentElement.style.setProperty('forced-color-adjust', 'none', 'important');
+      if (document.body) {
+        document.body.style.setProperty('color-scheme', 'only light', 'important');
       }
-    };
 
-    // 현재 선택된 게임 & 라운드 상태
+      const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.type === 'attributes' && (m.attributeName === 'style' || m.attributeName === 'data-dark-mode')) {
+            const target = m.target;
+            if (target.style && target.style.filter && target.style.filter.includes('invert')) {
+              target.style.removeProperty('filter');
+            }
+          }
+        }
+      });
+      observer.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['style', 'data-dark-mode'] });
+
+      document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+      document.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length > 1) e.preventDefault();
+      }, { passive: false });
+    })();
+
+    function bindInstantPress(element, callback) {
+      element.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        element.classList.add('is-pressed');
+        callback();
+      }, { passive: false });
+
+      const clearPress = () => element.classList.remove('is-pressed');
+      element.addEventListener('pointerup', clearPress, { passive: true });
+      element.addEventListener('pointercancel', clearPress, { passive: true });
+      element.addEventListener('pointerleave', clearPress, { passive: true });
+    }
+
+    // =============================================================
+    // 1. 채점용 정답 데이터셋 (화면 미노출 및 인코딩 처리)
+    // =============================================================
+    const _0x9e1c = "eyJnMSI6eyJyMSI6WyLruajqsITsg4kiLCLstIjroZ3sg4kiLCLqsoDsoJXsg4kiLCLrs7Trnbzsg4kiLCLso7ztmanka4kiLCLtjIjrnoDsg4kiLCLtlZHtgazsg4kiLCLqsIjrg4kiLCLqsoDsoJXsg4kiLCLruajqsITsg4kiLCLrhbjrnoDsg4kiLCLstIjroZ3sg4kiLCLtlZHtgazsg4kiLCLqsoDsoJXsg4kiLCLrs7Trnbzsg4kiXSwicjIiOlsi7YyI656A7IOJIiwi64W4656A7IOJIiwi6rKA7KCV7IOJIiwi7ZWR7YGs7IOJIiwi7LSI66Gd7IOJIiwi6rCI7IOJIiwi67O065287IOJIiwi6rKA7KCV7IOJIiwi7KO87Zmp7IOJIiwi64W4656A7IOJIiwi7YyI656A7IOJIiwi7LSI66Gd7IOJIiwi67mo6rCE7IOJIiwi6rKA7KCV7IOJIiwi7ZWR7YGs7IOJIJ19LCJnMiI6eyJyMSI6eyJzdDEiOls0LDgsMl0sInN0MiI6WzcsMSw5LDMsNSw4LDRdLCJzdDMiOls2LDIsOSwxLDUsNywzLDgsNCwyLDksNV19LCJyMiI6eyJzdDEiOlszLDcsMV0sInN0MiI6WzUsOSwyLDYsNCwxLDhdLCJzdDMiOls4LDQsMSw3LDMsOSwyLDYsNSw4LDEsNF19fX0=";
+    const _0x4a2f = (() => {
+      try {
+        const bin = atob(_0x9e1c);
+        const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+        return JSON.parse(new TextDecoder().decode(bytes));
+      } catch (e) {
+        return { g1: { r1: [], r2: [] }, g2: { r1: {}, r2: {} } };
+      }
+    })();
+
     let currentGame = 'g1';
     let currentRound = 1;
 
@@ -468,6 +499,7 @@
     // 2. 탭 제어 (게임 & 라운드)
     // =============================================================
     function switchGameTab(target) {
+      if (currentGame === target) return;
       currentGame = target;
       const viewG1 = document.getElementById('view-g1');
       const viewG2 = document.getElementById('view-g2');
@@ -489,6 +521,7 @@
     }
 
     function switchRoundTab(roundNum) {
+      if (currentRound === roundNum) return;
       currentRound = roundNum;
       const btnR1 = document.getElementById('round-btn-r1');
       const btnR2 = document.getElementById('round-btn-r2');
@@ -527,7 +560,6 @@
     ];
 
     const G1_MAX = 15;
-    // 라운드별로 데이터 저장 (r1, r2)
     const g1Data = {
       1: { selected: [], isActive: false },
       2: { selected: [], isActive: false }
@@ -535,18 +567,20 @@
 
     function renderG1Keypad() {
       const grid = document.getElementById('g1-keypad-grid');
-      grid.innerHTML = '';
+      const frag = document.createDocumentFragment();
       G1_PALETTE.forEach(color => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `keypad-btn relative w-full h-full rounded-2xl bg-gradient-to-b ${color.bg} ${color.border} ${color.text} flex flex-col items-center justify-center shadow-lg active:shadow-sm`;
+        btn.className = `keypad-btn relative w-full h-full rounded-2xl bg-gradient-to-b ${color.bg} ${color.border} ${color.text} flex flex-col items-center justify-center shadow-lg`;
         btn.innerHTML = `
-          <span class="w-2 h-2 rounded-full ${color.dot} opacity-80 mb-1 shadow-sm"></span>
+          <span class="w-2 h-2 rounded-full ${color.dot} opacity-80 mb-1 shadow-sm pointer-events-none"></span>
           <span class="text-[17px] font-extrabold tracking-tight drop-shadow-sm pointer-events-none">${color.name}</span>
         `;
-        btn.addEventListener('click', () => recordG1Color(color));
-        grid.appendChild(btn);
+        bindInstantPress(btn, () => recordG1Color(color));
+        frag.appendChild(btn);
       });
+      grid.innerHTML = '';
+      grid.appendChild(frag);
     }
 
     function startG1Game() {
@@ -562,7 +596,7 @@
       const state = g1Data[currentRound];
       if (!state.isActive || state.selected.length >= G1_MAX) return;
 
-      if (navigator.vibrate) navigator.vibrate(15);
+      if (navigator.vibrate) navigator.vibrate(10);
       state.selected.push(color);
       updateG1UI();
 
@@ -624,48 +658,49 @@
 
     function toggleG1HistoryModal() {
       const modal = document.getElementById('g1-history-modal');
-      const listEl = document.getElementById('g1-history-list');
-      const scoreBadge = document.getElementById('g1-score-badge');
-      document.getElementById('g1-modal-round-tag').textContent = `R${currentRound}`;
+      const isOpening = modal.classList.contains('hidden');
 
-      const state = g1Data[currentRound];
-      const targetAns = currentRound === 1 ? HARDCODED_ANSWERS.g1.r1 : HARDCODED_ANSWERS.g1.r2;
+      if (isOpening) {
+        const listEl = document.getElementById('g1-history-list');
+        const scoreBadge = document.getElementById('g1-score-badge');
+        document.getElementById('g1-modal-round-tag').textContent = `R${currentRound}`;
 
-      if (state.selected.length === 0) {
-        listEl.innerHTML = `<div class="py-10 text-center text-slate-400"><span>아직 입력된 색상이 없습니다.</span></div>`;
-        scoreBadge.textContent = `0 / 15 점`;
-      } else {
-        let correctCount = 0;
-        listEl.innerHTML = targetAns.map((correctColor, idx) => {
-          const userChoice = state.selected[idx];
-          if (!userChoice) {
+        const state = g1Data[currentRound];
+        const targetAns = currentRound === 1 ? _0x4a2f.g1.r1 : _0x4a2f.g1.r2;
+
+        if (state.selected.length === 0) {
+          listEl.innerHTML = `<div class="py-10 text-center text-slate-400"><span>아직 입력된 색상이 없습니다.</span></div>`;
+          scoreBadge.textContent = `0 / 15 점`;
+        } else {
+          let correctCount = 0;
+          listEl.innerHTML = targetAns.map((correctColor, idx) => {
+            const userChoice = state.selected[idx];
+            if (!userChoice) {
+              return `
+                <div class="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 opacity-50">
+                  <span class="w-5 text-slate-400 font-bold">#${String(idx + 1).padStart(2, '0')}</span>
+                  <span class="text-slate-400">미입력</span>
+                  <span class="text-slate-500 text-[10px]">-</span>
+                </div>
+              `;
+            }
+            const isCorrect = userChoice.name === correctColor;
+            if (isCorrect) correctCount++;
             return `
-              <div class="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 opacity-50">
-                <span class="w-5 text-slate-400 font-bold">#${String(idx + 1).padStart(2, '0')}</span>
-                <span class="text-slate-400">미입력</span>
-                <span class="text-slate-500">정답: ${correctColor}</span>
-              </div>
-            `;
-          }
-          const isCorrect = userChoice.name === correctColor;
-          if (isCorrect) correctCount++;
-          return `
-            <div class="flex items-center justify-between p-2 rounded-xl ${isCorrect ? 'bg-emerald-950/40 border border-emerald-500/30' : 'bg-rose-950/40 border border-rose-500/30'}">
-              <div class="flex items-center gap-2">
-                <span class="w-5 font-bold text-slate-300">#${String(idx + 1).padStart(2, '0')}</span>
-                <span class="w-2.5 h-2.5 rounded-full" style="background-color:${userChoice.hex}"></span>
-                <span class="font-bold ${isCorrect ? 'text-emerald-300' : 'text-rose-300'}">${userChoice.name}</span>
-              </div>
-              <div class="flex items-center gap-2">
-                ${!isCorrect ? `<span class="text-[10px] text-slate-400">정답: ${correctColor}</span>` : ''}
+              <div class="flex items-center justify-between p-2 rounded-xl ${isCorrect ? 'bg-emerald-950/40 border border-emerald-500/30' : 'bg-rose-950/40 border border-rose-500/30'}">
+                <div class="flex items-center gap-2">
+                  <span class="w-5 font-bold text-slate-300">#${String(idx + 1).padStart(2, '0')}</span>
+                  <span class="w-2.5 h-2.5 rounded-full" style="background-color:${userChoice.hex}"></span>
+                  <span class="font-bold ${isCorrect ? 'text-emerald-300' : 'text-rose-300'}">${userChoice.name}</span>
+                </div>
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-black ${isCorrect ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
                   ${isCorrect ? 'O' : 'X'}
                 </span>
               </div>
-            </div>
-          `;
-        }).join('');
-        scoreBadge.textContent = `${correctCount} / 15 점`;
+            `;
+          }).join('');
+          scoreBadge.textContent = `${correctCount} / 15 점`;
+        }
       }
 
       modal.classList.toggle('hidden');
@@ -696,7 +731,6 @@
       { stage: 3, limit: 12, label: 'St 3', key: 'st3' }
     ];
 
-    // 라운드별 독립 저장
     const g2Data = {
       1: { currentStageIndex: 0, inputs: [[], [], []] },
       2: { currentStageIndex: 0, inputs: [[], [], []] }
@@ -704,15 +738,17 @@
 
     function renderG2Keypad() {
       const grid = document.getElementById('g2-keypad-grid');
-      grid.innerHTML = '';
+      const frag = document.createDocumentFragment();
       for (let i = 1; i <= 9; i++) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = `num-btn relative w-full h-full rounded-2xl bg-gradient-to-b from-[#243f30] to-[#14261d] border-b-[#0b1711] text-amber-300 font-mono text-3xl font-black flex items-center justify-center active:bg-emerald-900/60 shadow-lg`;
         btn.textContent = i;
-        btn.addEventListener('click', () => recordG2Number(i));
-        grid.appendChild(btn);
+        bindInstantPress(btn, () => recordG2Number(i));
+        frag.appendChild(btn);
       }
+      grid.innerHTML = '';
+      grid.appendChild(frag);
     }
 
     function recordG2Number(num) {
@@ -721,7 +757,7 @@
       const currList = state.inputs[state.currentStageIndex];
 
       if (currList.length >= rule.limit) return;
-      if (navigator.vibrate) navigator.vibrate(12);
+      if (navigator.vibrate) navigator.vibrate(10);
 
       currList.push(num);
       updateG2UI();
@@ -782,9 +818,8 @@
         statusEl.className = 'text-xs font-semibold text-slate-300';
       }
 
-      // 슬롯 렌더링
       const slots = document.getElementById('g2-slots-container');
-      slots.innerHTML = '';
+      const frag = document.createDocumentFragment();
       for (let i = 0; i < rule.limit; i++) {
         const slot = document.createElement('div');
         if (i < currList.length) {
@@ -794,36 +829,31 @@
           slot.className = 'min-w-[26px] h-7 rounded-lg bg-white/5 border border-white/10 text-white/20 font-mono text-[11px] flex items-center justify-center';
           slot.textContent = i + 1;
         }
-        slots.appendChild(slot);
+        frag.appendChild(slot);
       }
+      slots.innerHTML = '';
+      slots.appendChild(frag);
     }
 
     function openG2VerificationModal() {
       document.getElementById('g2-modal-round-tag').textContent = `R${currentRound}`;
       const state = g2Data[currentRound];
-      const targetRoundAnswers = currentRound === 1 ? HARDCODED_ANSWERS.g2.r1 : HARDCODED_ANSWERS.g2.r2;
+      const targetRoundAnswers = currentRound === 1 ? _0x4a2f.g2.r1 : _0x4a2f.g2.r2;
 
       let totalScore = 0;
 
-      // 3개 스테이지 채점
       G2_RULES.forEach((rule, idx) => {
         const userList = state.inputs[idx];
-        const targetList = targetRoundAnswers[rule.key];
+        const targetList = targetRoundAnswers[rule.key] || [];
 
-        // 자릿수별 일치 검사
         let matchCount = 0;
         for (let j = 0; j < Math.min(userList.length, targetList.length); j++) {
           if (userList[j] === targetList[j]) matchCount++;
         }
         totalScore += matchCount;
 
-        const ansEl = document.getElementById(`g2-modal-ans-${rule.key}`);
-        const targetEl = document.getElementById(`g2-modal-target-${rule.key}`);
-        const scoreEl = document.getElementById(`g2-modal-${rule.key}-score`);
-
-        ansEl.textContent = userList.length > 0 ? userList.join(' - ') : '(미입력)';
-        targetEl.textContent = targetList.join(' - ');
-        scoreEl.textContent = `${matchCount} / ${rule.limit} 일치`;
+        document.getElementById(`g2-modal-ans-${rule.key}`).textContent = userList.length > 0 ? userList.join(' - ') : '(미입력)';
+        document.getElementById(`g2-modal-${rule.key}-score`).textContent = `${matchCount} / ${rule.limit} 일치`;
       });
 
       document.getElementById('g2-score-badge').textContent = `${totalScore} / 22 점`;
@@ -863,7 +893,8 @@
     // =============================================================
     function createSnowflakes() {
       const snowContainer = document.getElementById('snow-layer');
-      const count = 22;
+      const frag = document.createDocumentFragment();
+      const count = 18;
       for (let i = 0; i < count; i++) {
         const snowflake = document.createElement('div');
         snowflake.classList.add('snowflake');
@@ -873,18 +904,19 @@
         snowflake.style.left = `${Math.random() * 100}vw`;
         snowflake.style.animationDuration = `${Math.random() * 6 + 6}s`;
         snowflake.style.animationDelay = `${Math.random() * 5}s`;
-        snowContainer.appendChild(snowflake);
+        frag.appendChild(snowflake);
       }
+      snowContainer.appendChild(frag);
     }
 
-    window.onload = function() {
+    window.addEventListener('DOMContentLoaded', () => {
       createSnowflakes();
       renderG1Keypad();
       renderG2Keypad();
       syncHeaders();
       updateG1UI();
       updateG2UI();
-    };
+    });
   </script>
 </body>
 </html>
