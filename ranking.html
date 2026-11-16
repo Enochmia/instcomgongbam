@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="only light" />
+  <meta name="supported-color-schemes" content="light" />
+  <title>컴공인의 밤 - 실시간 조별 랭킹 전광판</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pretendard & JetBrains Mono Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700;800&display=swap" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      color-scheme: only light;
+      forced-color-adjust: none;
+      -webkit-forced-color-adjust: none;
+    }
+
+    * {
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      color-scheme: only light;
+      background-color: #05130b !important;
+      background-image: radial-gradient(circle at 50% 10%, #193d28 0%, #0d2317 55%, #05130b 100%) !important;
+      min-height: 100vh;
+      color: #f8fafc !important;
+      overflow-x: hidden;
+    }
+
+    /* 은은한 배경 눈꽃 효과 */
+    .snowflake {
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: #ffffff;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.22;
+      will-change: transform, opacity;
+      animation: snowfall linear infinite;
+    }
+    @keyframes snowfall {
+      0% { transform: translate3d(0, -8px, 0); opacity: 0; }
+      15% { opacity: 0.3; }
+      85% { opacity: 0.25; }
+      100% { transform: translate3d(18px, 105vh, 0); opacity: 0; }
+    }
+
+    .rank-card {
+      transition: transform 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between min-h-screen p-5 md:p-8 max-w-6xl mx-auto relative">
+
+  <!-- 눈꽃 레이어 -->
+  <div id="snow-layer" class="fixed inset-0 overflow-hidden pointer-events-none z-0"></div>
+
+  <!-- 상단 헤더 -->
+  <header class="w-full flex flex-col sm:flex-row items-center justify-between gap-4 pb-5 border-b border-white/10 z-10">
+    <div class="flex items-center gap-3.5">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400/25 to-emerald-500/25 border border-amber-400/40 flex items-center justify-center text-2xl shadow-lg">
+        🏆
+      </div>
+      <div>
+        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold tracking-wider font-mono mb-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>LIVE SCOREBOARD</span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          컴공인의 밤 · 에이징 테스트 <span class="text-amber-300">실시간 랭킹</span>
+        </h1>
+      </div>
+    </div>
+
+    <!-- 우측 상태 & 제어 버튼 -->
+    <div class="flex items-center gap-2.5 bg-black/40 border border-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-lg">
+      <div class="text-right pr-2 border-r border-white/10">
+        <div class="text-[10px] text-slate-400 font-semibold">만점 기준: 총 68점</div>
+        <div id="last-updated-text" class="text-xs font-mono font-bold text-emerald-300">연동 대기 중...</div>
+      </div>
+
+      <button onclick="toggleAutoRefresh()" id="auto-refresh-btn" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-bold text-emerald-300 transition-all active:scale-95">
+        자동갱신 ON
+      </button>
+
+      <button onclick="fetchRankings(true)" id="manual-refresh-btn" class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all active:scale-95 shadow-md">
+        ↻ 새로고침
+      </button>
+    </div>
+  </header>
+
+  <!-- 메인 랭킹 보드 -->
+  <main class="w-full flex-1 my-6 flex flex-col gap-5 z-10">
+    <!-- TOP 3 포디움 카드 -->
+    <section id="podium-container" class="grid grid-cols-1 md:grid-cols-3 gap-4"></section>
+
+    <!-- 4위 이하 전체 순위 리스트 (2열 그리드) -->
+    <section id="rest-container" class="grid grid-cols-1 md:grid-cols-2 gap-3"></section>
+  </main>
+
+  <!-- 하단 안내 -->
+  <footer class="w-full pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400 z-10">
+    <span>1R·2R 판단력 (각 15점) + 3R·4R 기억력 (각 19점) 합산 기준</span>
+    <span class="font-mono text-slate-500">컴퓨터공학과 학생회 컴패스</span>
+  </footer>
+
+  <script>
+    // =============================================================
+    // ★ [설정 영역] index.html과 동일한 값으로 맞춰주세요!
+    // =============================================================
+    const CONFIG = {
+      TOTAL_TEAMS: 10,
+      GAS_WEBAPP_URL: "https://script.google.com/macros/s/AKfycbxSGTjY8VdMXUicBjJhXJB1dTjAlzTyvD2zEs8Ecz27cMUgVVyS95spJyze7DlC0TPoqA/exec",
+      REFRESH_INTERVAL_MS: 4000 // 4초마다 자동 갱신
+    };
+
+    let autoRefreshEnabled = true;
+    let refreshTimer = null;
+
+    function isConfigured() {
+      return CONFIG.GAS_WEBAPP_URL && CONFIG.GAS_WEBAPP_URL.startsWith('https://');
+    }
+
+    async function fetchRankings(isManual = false) {
+      const updatedEl = document.getElementById('last-updated-text');
+      const manualBtn = document.getElementById('manual-refresh-btn');
+
+      if (!isConfigured()) {
+        const demoData = Array.from({ length: CONFIG.TOTAL_TEAMS }, (_, i) => ({
+          team: i + 1,
+          r1: 0,
+          r2: 0,
+          r3: 0,
+          r4: 0,
+          total: 0,
+          rank: 1
+        }));
+        renderScoreboard(demoData);
+        updatedEl.textContent = '시트 URL 미설정 (미리보기)';
+        return;
+      }
+
+      if (isManual && manualBtn) manualBtn.textContent = '갱신 중...';
+
+      try {
+        const url = `${CONFIG.GAS_WEBAPP_URL}?totalTeams=${CONFIG.TOTAL_TEAMS}&t=${Date.now()}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data && Array.isArray(data.rankings)) {
+          renderScoreboard(data.rankings);
+          const now = new Date();
+          const hh = String(now.getHours()).padStart(2, '0');
+          const mm = String(now.getMinutes()).padStart(2, '0');
+          const ss = String(now.getSeconds()).padStart(2, '0');
+          updatedEl.textContent = `갱신 완료 (${hh}:${mm}:${ss})`;
+        }
+      } catch (err) {
+        updatedEl.textContent = '연결 지연 · 재시도 중';
+      } finally {
+        if (isManual && manualBtn) manualBtn.textContent = '↻ 새로고침';
+      }
+    }
+
+    function renderScoreboard(rankings) {
+      const podiumEl = document.getElementById('podium-container');
+      const restEl = document.getElementById('rest-container');
+
+      const top3 = rankings.slice(0, 3);
+      const rest = rankings.slice(3);
+
+      // TOP 3 렌더링
+      podiumEl.innerHTML = top3.map((item, idx) => {
+        const styles = [
+          {
+            medal: '🥇',
+            badge: '1ST PLACE',
+            card: 'bg-gradient-to-b from-amber-500/25 via-amber-950/40 to-black/50 border-2 border-amber-400 shadow-2xl shadow-amber-950/50',
+            title: 'text-amber-300',
+            score: 'text-amber-300'
+          },
+          {
+            medal: '🥈',
+            badge: '2ND PLACE',
+            card: 'bg-gradient-to-b from-slate-300/20 via-slate-900/50 to-black/50 border border-slate-300/50 shadow-xl',
+            title: 'text-slate-200',
+            score: 'text-white'
+          },
+          {
+            medal: '🥉',
+            badge: '3RD PLACE',
+            card: 'bg-gradient-to-b from-orange-500/20 via-stone-900/50 to-black/50 border border-orange-400/45 shadow-xl',
+            title: 'text-orange-300',
+            score: 'text-orange-200'
+          }
+        ][idx];
+
+        return `
+          <div class="rank-card rounded-3xl p-5 backdrop-blur-md flex flex-col justify-between ${styles.card}">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2.5">
+                <span class="text-3xl">${styles.medal}</span>
+                <div>
+                  <div class="font-mono text-[10px] font-extrabold tracking-widest ${styles.title}">${item.rank}위 · ${styles.badge}</div>
+                  <div class="text-2xl font-black text-white mt-0.5">${item.team}조</div>
+                </div>
+              </div>
+              <div class="text-right font-mono">
+                <div class="text-[11px] text-slate-300">누적 총점</div>
+                <div class="text-3xl font-black ${styles.score}">${item.total}<span class="text-sm font-bold text-slate-300 ml-0.5">점</span></div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-4 gap-1.5 pt-3 border-t border-white/10 font-mono text-center">
+              <div class="bg-black/35 rounded-xl py-1.5 px-1">
+                <div class="text-[10px] text-slate-400">1R</div>
+                <div class="text-xs font-extrabold text-emerald-300">${item.r1}</div>
+              </div>
+              <div class="bg-black/35 rounded-xl py-1.5 px-1">
+                <div class="text-[10px] text-slate-400">2R</div>
+                <div class="text-xs font-extrabold text-emerald-300">${item.r2}</div>
+              </div>
+              <div class="bg-black/35 rounded-xl py-1.5 px-1">
+                <div class="text-[10px] text-slate-400">3R</div>
+                <div class="text-xs font-extrabold text-amber-300">${item.r3}</div>
+              </div>
+              <div class="bg-black/35 rounded-xl py-1.5 px-1">
+                <div class="text-[10px] text-slate-400">4R</div>
+                <div class="text-xs font-extrabold text-amber-300">${item.r4}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // 4위 이하 렌더링
+      restEl.innerHTML = rest.map(item => `
+        <div class="rank-card rounded-2xl px-4 py-3 bg-black/40 border border-white/10 backdrop-blur-md flex items-center justify-between shadow-md">
+          <div class="flex items-center gap-3.5">
+            <span class="w-10 text-center font-mono font-black text-base text-slate-400">${item.rank}위</span>
+            <div>
+              <div class="text-lg font-black text-white">${item.team}조</div>
+              <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 mt-0.5">
+                <span>1R:<b class="text-emerald-300">${item.r1}</b></span>
+                <span>2R:<b class="text-emerald-300">${item.r2}</b></span>
+                <span>3R:<b class="text-amber-300">${item.r3}</b></span>
+                <span>4R:<b class="text-amber-300">${item.r4}</b></span>
+              </div>
+            </div>
+          </div>
+          <div class="font-mono font-black text-2xl text-emerald-300">
+            ${item.total}<span class="text-xs font-bold text-slate-400 ml-0.5">점</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleAutoRefresh() {
+      autoRefreshEnabled = !autoRefreshEnabled;
+      const btn = document.getElementById('auto-refresh-btn');
+      if (autoRefreshEnabled) {
+        btn.textContent = '자동갱신 ON';
+        btn.className = 'px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-bold text-emerald-300 transition-all active:scale-95';
+        startAutoRefresh();
+      } else {
+        btn.textContent = '자동갱신 OFF';
+        btn.className = 'px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-bold text-slate-400 transition-all active:scale-95';
+        if (refreshTimer) clearInterval(refreshTimer);
+      }
+    }
+
+    function startAutoRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(() => {
+        if (autoRefreshEnabled) fetchRankings(false);
+      }, CONFIG.REFRESH_INTERVAL_MS);
+    }
+
+    function createSnowflakes() {
+      const snowContainer = document.getElementById('snow-layer');
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < 22; i++) {
+        const snowflake = document.createElement('div');
+        snowflake.classList.add('snowflake');
+        const size = Math.random() * 2.5 + 1.5;
+        snowflake.style.width = `${size}px`;
+        snowflake.style.height = `${size}px`;
+        snowflake.style.left = `${Math.random() * 100}vw`;
+        snowflake.style.animationDuration = `${Math.random() * 6 + 6}s`;
+        snowflake.style.animationDelay = `${Math.random() * 5}s`;
+        frag.appendChild(snowflake);
+      }
+      snowContainer.appendChild(frag);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      createSnowflakes();
+      fetchRankings(false);
+      startAutoRefresh();
+    });
+  </script>
+</body>
+</html>
